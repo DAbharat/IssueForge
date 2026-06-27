@@ -1,0 +1,60 @@
+# =========================
+# Go Binaries
+# =========================
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Coverage reports
+*.out
+coverage.out
+
+# =========================
+# Go Workspace
+# =========================
+go.work
+go.work.sum
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# IDEs
+# =========================
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Temporary Files
+# =========================
+tmp/
+
+# =========================
+# Vendor (Uncomment if you don't commit vendor/)
+# =========================
+# vendor/
