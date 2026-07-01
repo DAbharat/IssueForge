@@ -76,7 +76,7 @@ func (s *UserService) CreateUser(
 
 	user, err := s.userRepo.CreateUser(ctx, params)
 	if err != nil {
-		return dto.CreateUserResponse{}, fmt.Errorf("create user(service): %w", err)
+		return dto.CreateUserResponse{}, fmt.Errorf("create user: %w", err)
 	}
 
 	return dto.CreateUserResponse{

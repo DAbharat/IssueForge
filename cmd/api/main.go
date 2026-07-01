@@ -3,7 +3,11 @@ package main
 import (
 	postgres "IssueForge/internal/db"
 	"IssueForge/internal/db/config"
+	"IssueForge/internal/db/sqlc"
+	"IssueForge/internal/handler"
+	"IssueForge/internal/repository"
 	"IssueForge/internal/router"
+	"IssueForge/internal/service"
 	"context"
 	"errors"
 	"log"
@@ -38,7 +42,12 @@ func main() {
 		log.Fatalf("load postgres: %v", err)
 	}
 
-	r := router.New()
+	queries := sqlc.New(pool)
+	userRepo := repository.NewUserRepository(queries)
+	userService := service.NewUserService(userRepo)
+	userHandler := handler.NewUserHandler(userService)
+
+	r := router.New(userHandler)
 
 	server := &http.Server{
 		Addr:              serverAddr,

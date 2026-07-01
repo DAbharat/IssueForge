@@ -6,8 +6,11 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func New() *mux.Router {
+func New(userHandler *handler.UserHandler) *mux.Router {
 	r := mux.NewRouter()
-	r.HandleFunc("/api/health", handler.HealthCheckHandler).Methods("GET")
+
+	registerHealthRoutes(r)
+	registerUserRoutes(r, userHandler)
+
 	return r
 }

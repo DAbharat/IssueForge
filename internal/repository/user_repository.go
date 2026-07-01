@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
@@ -19,9 +18,9 @@ type UserRepository struct {
 	queries *sqlc.Queries
 }
 
-func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
+func NewUserRepository(queries *sqlc.Queries) *UserRepository {
 	return &UserRepository{
-		queries: sqlc.New(pool),
+		queries: queries,
 	}
 }
 
