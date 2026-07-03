@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
 var (
 	ErrDuplicateEmail    = errors.New("email already exists")
 	ErrDuplicateUsername = errors.New("username already exists")
+	ErrUserNotFound      = errors.New("user not found")
 )
 
 type UserRepository struct {
@@ -24,13 +26,10 @@ func NewUserRepository(queries *sqlc.Queries) *UserRepository {
 	}
 }
 
-func (r *UserRepository) CreateUser(
-	ctx context.Context,
-	params sqlc.CreateUserParams,
-) (sqlc.User, error) {
-
+func (r *UserRepository) CreateUser(ctx context.Context, params sqlc.CreateUserParams) (sqlc.User, error) {
 	user, err := r.queries.CreateUser(ctx, params)
 	if err != nil {
+
 		var pgErr *pgconn.PgError
 
 		if errors.As(err, &pgErr) {
@@ -46,5 +45,18 @@ func (r *UserRepository) CreateUser(
 		}
 		return sqlc.User{}, fmt.Errorf("create user: %w", err)
 	}
+
+	return user, nil
+}
+
+func (r *UserRepository) GetUserForLogin(ctx context.Context, identifier string) (sqlc.GetUserForLoginRow, error) {
+	user, err := r.queries.GetUserForLogin(ctx, identifier)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.GetUserForLoginRow{}, ErrUserNotFound
+		}
+		return sqlc.GetUserForLoginRow{}, fmt.Errorf("get user for login: %w", err)
+	}
+
 	return user, nil
 }
