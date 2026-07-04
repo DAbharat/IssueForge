@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -12,11 +13,12 @@ type Config struct {
 	DBUser     string
 	DBPassword string
 	DBName     string
+	JWTSecret  string
 }
 
 func Load() (*Config, error) {
 
-	requiredEnvVars := []string{"DB_HOST", "DB_PASSWORD", "DB_USER", "DB_PORT", "DB_NAME"}
+	requiredEnvVars := []string{"DB_HOST", "DB_PASSWORD", "DB_USER", "DB_PORT", "DB_NAME", "SECRETKEY"}
 	missingVars := checkMissingENV(requiredEnvVars)
 
 	if len(missingVars) > 0 {
@@ -35,6 +37,10 @@ func Load() (*Config, error) {
 		DBUser:     os.Getenv("DB_USER"),
 		DBPassword: os.Getenv("DB_PASSWORD"),
 		DBName:     os.Getenv("DB_NAME"),
+		JWTSecret:  os.Getenv("SECRETKEY"),
+	}
+	if cfg.JWTSecret == "" {
+		return &Config{}, errors.New("JWT_SECRET is required")
 	}
 
 	return cfg, nil

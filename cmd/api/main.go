@@ -44,7 +44,7 @@ func main() {
 
 	queries := sqlc.New(pool)
 	userRepo := repository.NewUserRepository(queries)
-	userService := service.NewUserService(userRepo)
+	userService := service.NewUserService(userRepo, cfg.JWTSecret)
 	userHandler := handler.NewUserHandler(userService)
 
 	r := router.New(userHandler)

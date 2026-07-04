@@ -20,5 +20,5 @@ type LoginUserRequest struct {
 }
 
 type LoginUserResponse struct {
-	ID int64 `json:"id"`
+	AccessToken string `json:"access_token"`
 }

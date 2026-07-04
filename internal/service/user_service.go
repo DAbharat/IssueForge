@@ -1,6 +1,7 @@
 package service
 
 import (
+	"IssueForge/internal/auth"
 	"IssueForge/internal/db/sqlc"
 	"IssueForge/internal/dto"
 	"IssueForge/internal/repository"
@@ -24,12 +25,14 @@ const passwordHashCost = bcrypt.DefaultCost
 const dummyHash = "$2a$10$Az9g3YmX8.L7Z8gH4q2uOu9yVj6X7W4E8k3d1c9b8a7f6e5d4c3b2"
 
 type UserService struct {
-	userRepo *repository.UserRepository
+	userRepo  *repository.UserRepository
+	jwtSecret string
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
+func NewUserService(repo *repository.UserRepository, jwtSecret string) *UserService {
 	return &UserService{
-		userRepo: repo,
+		userRepo:  repo,
+		jwtSecret: jwtSecret,
 	}
 }
 
@@ -114,7 +117,12 @@ func (s *UserService) Login(ctx context.Context, req dto.LoginUserRequest) (dto.
 		return dto.LoginUserResponse{}, ErrInvalidCredentials
 	}
 
+	token, err := auth.GenerateToken(user.ID, s.jwtSecret)
+	if err != nil {
+		return dto.LoginUserResponse{}, fmt.Errorf("generate jwt: %w", err)
+	}
+
 	return dto.LoginUserResponse{
-		ID: user.ID,
+		AccessToken: token,
 	}, nil
 }
