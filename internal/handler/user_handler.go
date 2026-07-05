@@ -2,6 +2,7 @@ package handler
 
 import (
 	"IssueForge/internal/dto"
+	"IssueForge/internal/middleware"
 	"IssueForge/internal/repository"
 	"IssueForge/internal/service"
 	"encoding/json"
@@ -90,6 +91,32 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(user); err != nil {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		respondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	user, err := h.userService.GetCurrentUser(r.Context(), userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrUserNotFound):
+			respondWithError(w, http.StatusNotFound, err.Error())
+		default:
+			respondWithError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(user); err != nil {
 		return
 	}
 }

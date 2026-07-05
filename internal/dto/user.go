@@ -22,3 +22,10 @@ type LoginUserRequest struct {
 type LoginUserResponse struct {
 	AccessToken string `json:"access_token"`
 }
+
+type MeResponse struct {
+	ID       int64  `json:"id"`
+	Username string `json:"username"`
+	Fullname string `json:"fullname"`
+	Email    string `json:"email"`
+}

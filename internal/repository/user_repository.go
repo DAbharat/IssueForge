@@ -60,3 +60,14 @@ func (r *UserRepository) GetUserForLogin(ctx context.Context, identifier string)
 
 	return user, nil
 }
+
+func (r *UserRepository) GetUserByID(ctx context.Context, id int64) (sqlc.GetUserByIDRow, error) {
+	user, err := r.queries.GetUserByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.GetUserByIDRow{}, ErrUserNotFound
+		}
+		return sqlc.GetUserByIDRow{}, fmt.Errorf("get user by id: %w", err)
+	}
+	return user, nil
+}

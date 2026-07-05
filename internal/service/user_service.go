@@ -81,10 +81,15 @@ func (s *UserService) CreateUser(ctx context.Context, req dto.CreateUserRequest)
 		return dto.CreateUserResponse{}, fmt.Errorf("create user: %w", err)
 	}
 
+	fullNameVal := ""
+	if user.Fullname.Valid {
+		fullNameVal = user.Fullname.String
+	}
+
 	return dto.CreateUserResponse{
 		ID:       user.ID,
 		Username: user.Username,
-		Fullname: user.Fullname.String,
+		Fullname: fullNameVal,
 		Email:    user.Email,
 	}, nil
 }
@@ -124,5 +129,24 @@ func (s *UserService) Login(ctx context.Context, req dto.LoginUserRequest) (dto.
 
 	return dto.LoginUserResponse{
 		AccessToken: token,
+	}, nil
+}
+
+func (s *UserService) GetCurrentUser(ctx context.Context, userID int64) (dto.MeResponse, error) {
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return dto.MeResponse{}, err
+	}
+
+	fullNameVal := ""
+	if user.Fullname.Valid {
+		fullNameVal = user.Fullname.String
+	}
+
+	return dto.MeResponse{
+		ID:       user.ID,
+		Username: user.Username,
+		Fullname: fullNameVal,
+		Email:    user.Email,
 	}, nil
 }

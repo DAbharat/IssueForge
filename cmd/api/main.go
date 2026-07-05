@@ -5,6 +5,7 @@ import (
 	"IssueForge/internal/db/config"
 	"IssueForge/internal/db/sqlc"
 	"IssueForge/internal/handler"
+	"IssueForge/internal/middleware"
 	"IssueForge/internal/repository"
 	"IssueForge/internal/router"
 	"IssueForge/internal/service"
@@ -46,8 +47,9 @@ func main() {
 	userRepo := repository.NewUserRepository(queries)
 	userService := service.NewUserService(userRepo, cfg.JWTSecret)
 	userHandler := handler.NewUserHandler(userService)
+	authMiddleware := middleware.NewAuthMiddleware(cfg.JWTSecret)
 
-	r := router.New(userHandler)
+	r := router.New(userHandler, authMiddleware)
 
 	server := &http.Server{
 		Addr:              serverAddr,
