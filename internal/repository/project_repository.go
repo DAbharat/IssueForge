@@ -35,3 +35,11 @@ func (r *ProjectRepository) CreateProject(ctx context.Context, params sqlc.Creat
 	}
 	return project, nil
 }
+
+func (r *ProjectRepository) ListProjectsByOwner(ctx context.Context, ownerID int64) ([]sqlc.Project, error) {
+	projects, err := r.queries.ListProjectsByOwner(ctx, ownerID)
+	if err != nil {
+		return nil, fmt.Errorf("list projects: %w", err)
+	}
+	return projects, nil
+}

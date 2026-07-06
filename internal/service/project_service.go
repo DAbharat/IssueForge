@@ -59,3 +59,22 @@ func (s *ProjectService) CreateProject(ctx context.Context, ownerID int64, req d
 		Description: project.Description,
 	}, nil
 }
+
+func (s *ProjectService) ListProjects(ctx context.Context, ownerID int64) ([]dto.ProjectResponse, error) {
+	dbProjects, err := s.projectRepo.ListProjectsByOwner(ctx, ownerID)
+	if err != nil {
+		return nil, fmt.Errorf("list projects service failure: %w", err)
+	}
+
+	projects := make([]dto.ProjectResponse, 0, len(dbProjects))
+
+	for _, p := range dbProjects {
+		projects = append(projects, dto.ProjectResponse{
+			ID:          p.ID,
+			OwnerID:     p.OwnerID,
+			Name:        p.Name,
+			Description: p.Description,
+		})
+	}
+	return projects, nil
+}

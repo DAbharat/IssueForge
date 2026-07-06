@@ -40,3 +40,36 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 	)
 	return i, err
 }
+
+const listProjectsByOwner = `-- name: ListProjectsByOwner :many
+SELECT id, owner_id, name, description, created_at, updated_at FROM projects
+WHERE owner_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListProjectsByOwner(ctx context.Context, ownerID int64) ([]Project, error) {
+	rows, err := q.db.Query(ctx, listProjectsByOwner, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Project
+	for rows.Next() {
+		var i Project
+		if err := rows.Scan(
+			&i.ID,
+			&i.OwnerID,
+			&i.Name,
+			&i.Description,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
