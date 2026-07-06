@@ -5,5 +5,6 @@ CREATE TABLE
         name TEXT NOT NULL,
         description TEXT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW (),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW ()
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW (),
+        CONSTRAINT projects_owner_id_name_key UNIQUE (owner_id, name)
     );

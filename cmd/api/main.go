@@ -48,8 +48,11 @@ func main() {
 	userService := service.NewUserService(userRepo, cfg.JWTSecret)
 	userHandler := handler.NewUserHandler(userService)
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWTSecret)
+	projectRepo := repository.NewProjectRepository(queries)
+	projectService := service.NewProjectService(projectRepo)
+	projectHandler := handler.NewProjectHandler(projectService)
 
-	r := router.New(userHandler, authMiddleware)
+	r := router.New(userHandler, projectHandler, authMiddleware)
 
 	server := &http.Server{
 		Addr:              serverAddr,
