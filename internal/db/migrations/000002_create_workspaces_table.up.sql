@@ -1,5 +1,5 @@
-CREATE TABLE
-    IF NOT EXISTS workspaces (
+CREATE TABLE 
+    workspaces (
         id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         name TEXT NOT NULL UNIQUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW (),

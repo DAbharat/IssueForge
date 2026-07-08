@@ -1,5 +1,5 @@
 CREATE TABLE
-    IF NOT EXISTS projects (
+    projects (
         id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         workspace_id BIGINT NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
         lead_id BIGINT NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
@@ -12,7 +12,7 @@ CREATE TABLE
 
 CREATE INDEX IF NOT EXISTS idx_projects_lead_id ON projects (lead_id);
 
-CREATE INDEX idx_projects_workspace ON projects(workspace_id);
+CREATE INDEX idx_projects_workspace ON projects (workspace_id);
 
 CREATE
 OR REPLACE TRIGGER update_projects_updated_at BEFORE

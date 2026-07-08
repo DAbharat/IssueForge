@@ -9,12 +9,24 @@ import (
 )
 
 type Querier interface {
-	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
-	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
-	GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error)
+	AddMemberToProject(ctx context.Context, arg AddMemberToProjectParams) (ProjectMember, error)
+	AddWorkspaceMember(ctx context.Context, arg AddWorkspaceMemberParams) (WorkspaceMember, error)
+	CreateOnboardingUser(ctx context.Context, arg CreateOnboardingUserParams) (CreateOnboardingUserRow, error)
+	CreateProject(ctx context.Context, arg CreateProjectParams) (CreateProjectRow, error)
+	CreateWorkspace(ctx context.Context, name string) (Workspace, error)
 	GetUserByID(ctx context.Context, id int64) (GetUserByIDRow, error)
 	GetUserForLogin(ctx context.Context, email string) (GetUserForLoginRow, error)
-	ListProjectsByOwner(ctx context.Context, ownerID int64) ([]Project, error)
+	GetWorkspaceByID(ctx context.Context, id int64) (Workspace, error)
+	GetWorkspaceByName(ctx context.Context, name string) (Workspace, error)
+	GetWorkspaceMember(ctx context.Context, arg GetWorkspaceMemberParams) (GetWorkspaceMemberRow, error)
+	IsWorkspaceMember(ctx context.Context, arg IsWorkspaceMemberParams) (UserRole, error)
+	ListProjectMembers(ctx context.Context, projectID int64) ([]ListProjectMembersRow, error)
+	ListProjectsByLead(ctx context.Context, leadID int64) ([]Project, error)
+	ListProjectsByWorkspace(ctx context.Context, workspaceID int64) ([]Project, error)
+	ListUserWorkspaces(ctx context.Context, userID int64) ([]ListUserWorkspacesRow, error)
+	ListWorkspaceMembers(ctx context.Context, workspaceID int64) ([]ListWorkspaceMembersRow, error)
+	RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) (RemoveWorkspaceMemberRow, error)
+	SafeAddMemberToProject(ctx context.Context, arg SafeAddMemberToProjectParams) (ProjectMember, error)
 }
 
 var _ Querier = (*Queries)(nil)
