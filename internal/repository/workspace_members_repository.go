@@ -31,12 +31,13 @@ func (r *WorkspaceMemberRepository) AddWorkspaceMember(ctx context.Context, work
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
-			if pgErr.Code == "23505" {
+			switch pgErr.Code {
+			case "23505":
 				switch pgErr.ConstraintName {
 				case "workspace_members_pkey":
 					return sqlc.WorkspaceMember{}, ErrWorkspaceMemberAlreadyExists
 				}
-			} else if pgErr.Code == "23503" {
+			case "23503":
 				switch pgErr.ConstraintName {
 				case "workspace_members_workspace_id_fkey":
 					return sqlc.WorkspaceMember{}, ErrWorkspaceNotFound

@@ -3,9 +3,14 @@ package repository
 import "errors"
 
 var (
-	ErrWorkspaceMemberAlreadyExists = errors.New("user already exists in this workspace")
-	ErrWorkspaceNotFound            = errors.New("workspace does not exist")
-	ErrWorkspaceMemberNotFound      = errors.New("member does not exist in this workspace")
-	ErrDuplicateEmail               = errors.New("email already exists")
-	ErrUserNotFound                 = errors.New("user not found")
+	ErrWorkspaceMemberAlreadyExists  = errors.New("user already exists in this workspace")
+	ErrWorkspaceNotFound             = errors.New("workspace does not exist")
+	ErrWorkspaceMemberNotFound       = errors.New("member does not exist in this workspace")
+	ErrDuplicateEmail                = errors.New("email already exists")
+	ErrUserNotFound                  = errors.New("user not found")
+	ErrWorkspaceAlreadyExists        = errors.New("workspace with this name already exists")
+	ErrProjectAlreadyExists          = errors.New("project with this name already exists")
+	ErrProjectMemberAlreadyExists    = errors.New("member already exists in this project")
+	ErrProjectNotFound               = errors.New("project does not exist")
+	ErrProjectMemberValidationFailed = errors.New("cannot add the user in this project")
 )
