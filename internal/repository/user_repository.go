@@ -20,7 +20,7 @@ func NewUserRepository(queries *sqlc.Queries) *UserRepository {
 	}
 }
 
-func (r *UserRepository) CreateUser(ctx context.Context, email, fullName, displayName, passwordHash string) (sqlc.CreateOnboardingUserRow, error) {
+func (r *UserRepository) CreateUser(ctx context.Context, email, displayName, fullName, passwordHash string) (sqlc.CreateOnboardingUserRow, error) {
 	params := sqlc.CreateOnboardingUserParams{
 		Email:        email,
 		Fullname:     fullName,

@@ -10,29 +10,33 @@ import (
 	"fmt"
 	"net/mail"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
-)
-
-var (
-	ErrInvalidPassword    = errors.New("password must be atleast 8 characters")
-	ErrInvalidUsername    = errors.New("username must be more than 3 characters")
-	ErrInvalidEmail       = errors.New("email is invalid")
-	ErrInvalidCredentials = errors.New("invalid credentials")
 )
 
 const passwordHashCost = bcrypt.DefaultCost
 const dummyHash = "$2a$10$Az9g3YmX8.L7Z8gH4q2uOu9yVj6X7W4E8k3d1c9b8a7f6e5d4c3b2"
 
-type UserService struct {
-	userRepo  *repository.UserRepository
-	jwtSecret string
+type UserRepo interface {
+	CreateUser(ctx context.Context, email, displayName, fullname, passwordHash string) (sqlc.CreateOnboardingUserRow, error)
+	GetUserForLogin(ctx context.Context, email string) (sqlc.GetUserForLoginRow, error)
+	GetUserByID(ctx context.Context, id int64) (sqlc.GetUserByIDRow, error)
 }
 
-func NewUserService(repo *repository.UserRepository, jwtSecret string) *UserService {
+type WorkspaceMemberRepo interface {
+	ListUserWorkspaces(ctx context.Context, userID int64) ([]sqlc.ListUserWorkspacesRow, error)
+}
+
+type UserService struct {
+	userRepo            UserRepo
+	workspaceMemberRepo WorkspaceMemberRepo
+	jwtSecret           string
+}
+
+func NewUserService(userRepo UserRepo, workspaceMemberRepo WorkspaceMemberRepo, jwtSecret string) *UserService {
 	return &UserService{
-		userRepo:  repo,
-		jwtSecret: jwtSecret,
+		userRepo:            userRepo,
+		workspaceMemberRepo: workspaceMemberRepo,
+		jwtSecret:           jwtSecret,
 	}
 }
 
@@ -41,8 +45,8 @@ func (s *UserService) validateCreateUser(req dto.CreateUserRequest) error {
 	if len(req.Password) < 8 {
 		return ErrInvalidPassword
 	}
-	if len(req.Username) < 3 {
-		return ErrInvalidUsername
+	if len(req.Fullname) < 3 {
+		return ErrInvalidFullName
 	}
 	if _, err := mail.ParseAddress(req.Email); err != nil {
 		return ErrInvalidEmail
@@ -52,7 +56,6 @@ func (s *UserService) validateCreateUser(req dto.CreateUserRequest) error {
 }
 
 func (s *UserService) CreateUser(ctx context.Context, req dto.CreateUserRequest) (dto.CreateUserResponse, error) {
-
 	if err := s.validateCreateUser(req); err != nil {
 		return dto.CreateUserResponse{}, err
 	}
@@ -65,44 +68,31 @@ func (s *UserService) CreateUser(ctx context.Context, req dto.CreateUserRequest)
 		return dto.CreateUserResponse{}, fmt.Errorf("hash password failed: %w", err)
 	}
 
-	//DTO->sqlc params
-	params := sqlc.CreateUserParams{
-		Username: req.Username,
-		Fullname: pgtype.Text{
-			String: req.Fullname,
-			Valid:  req.Fullname != "",
-		},
-		Email:        req.Email,
-		PasswordHash: string(hashedPassword),
-	}
-
-	user, err := s.userRepo.CreateUser(ctx, params)
+	user, err := s.userRepo.CreateUser(ctx, req.Email, req.DisplayName, req.Fullname, string(hashedPassword))
 	if err != nil {
+		if errors.Is(err, repository.ErrDuplicateEmail) {
+			return dto.CreateUserResponse{}, err
+		}
 		return dto.CreateUserResponse{}, fmt.Errorf("create user: %w", err)
 	}
 
-	fullNameVal := ""
-	if user.Fullname.Valid {
-		fullNameVal = user.Fullname.String
-	}
-
 	return dto.CreateUserResponse{
-		ID:       user.ID,
-		Username: user.Username,
-		Fullname: fullNameVal,
-		Email:    user.Email,
+		ID:          user.ID,
+		DisplayName: user.DisplayName,
+		Fullname:    user.Fullname,
+		Email:       user.Email,
 	}, nil
 }
 
 func (s *UserService) Login(ctx context.Context, req dto.LoginUserRequest) (dto.LoginUserResponse, error) {
-	if req.Identifier == "" || req.Password == "" {
+	if req.Email == "" || req.Password == "" {
 		return dto.LoginUserResponse{}, ErrInvalidCredentials
 	}
 
 	var hashToCompare string
 	userExists := true
 
-	user, err := s.userRepo.GetUserForLogin(ctx, req.Identifier)
+	user, err := s.userRepo.GetUserForLogin(ctx, req.Email)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
 			hashToCompare = dummyHash
@@ -127,8 +117,20 @@ func (s *UserService) Login(ctx context.Context, req dto.LoginUserRequest) (dto.
 		return dto.LoginUserResponse{}, fmt.Errorf("generate jwt: %w", err)
 	}
 
+	workspaces, err := s.workspaceMemberRepo.ListUserWorkspaces(ctx, user.ID)
+	if err != nil {
+		return dto.LoginUserResponse{}, fmt.Errorf("get login workspaces: %w", err)
+	}
+
 	return dto.LoginUserResponse{
 		AccessToken: token,
+		User: dto.MeResponse{
+			ID:          user.ID,
+			DisplayName: user.DisplayName,
+			Fullname:    user.Fullname,
+			Email:       user.Email,
+			Workspaces:  s.mapWorkspaces(workspaces),
+		},
 	}, nil
 }
 
@@ -138,15 +140,28 @@ func (s *UserService) GetCurrentUser(ctx context.Context, userID int64) (dto.MeR
 		return dto.MeResponse{}, err
 	}
 
-	fullNameVal := ""
-	if user.Fullname.Valid {
-		fullNameVal = user.Fullname.String
+	workspaces, err := s.workspaceMemberRepo.ListUserWorkspaces(ctx, userID)
+	if err != nil {
+		return dto.MeResponse{}, fmt.Errorf("get user workspaces: %w", err)
 	}
 
 	return dto.MeResponse{
-		ID:       user.ID,
-		Username: user.Username,
-		Fullname: fullNameVal,
-		Email:    user.Email,
+		ID:          user.ID,
+		DisplayName: user.DisplayName,
+		Fullname:    user.Fullname,
+		Email:       user.Email,
+		Workspaces:  s.mapWorkspaces(workspaces),
 	}, nil
+}
+
+func (s *UserService) mapWorkspaces(workspaces []sqlc.ListUserWorkspacesRow) []dto.WorkspaceSummary {
+	workspaceSummaries := make([]dto.WorkspaceSummary, 0, len(workspaces))
+	for _, ws := range workspaces {
+		workspaceSummaries = append(workspaceSummaries, dto.WorkspaceSummary{
+			ID:   ws.ID,
+			Name: ws.Name,
+			Role: string(ws.Role),
+		})
+	}
+	return workspaceSummaries
 }

@@ -12,8 +12,6 @@ type CreateUserResponse struct {
 	DisplayName string `json:"display_name"`
 	Fullname    string `json:"fullname"`
 	Email       string `json:"email"`
-	Role        string `json:"role"`
-	WorkspaceID *int64 `json:"workspace_id,omitempty"`
 }
 
 type LoginUserRequest struct {
@@ -26,11 +24,16 @@ type LoginUserResponse struct {
 	User        MeResponse `json:"user"`
 }
 
+type WorkspaceSummary struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+	Role string `json:"role"`
+}
+
 type MeResponse struct {
-	ID          int64  `json:"id"`
-	WorkspaceID *int64 `json:"workspace_id"`
-	DisplayName string `json:"display_name"`
-	Fullname    string `json:"fullname"`
-	Email       string `json:"email"`
-	Role        string `json:"role"`
+	ID          int64              `json:"id"`
+	DisplayName string             `json:"display_name"`
+	Fullname    string             `json:"fullname"`
+	Email       string             `json:"email"`
+	Workspaces  []WorkspaceSummary `json:"workspaces"`
 }

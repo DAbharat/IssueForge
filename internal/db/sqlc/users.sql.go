@@ -88,7 +88,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (GetUserByIDRow, er
 }
 
 const getUserForLogin = `-- name: GetUserForLogin :one
-SELECT id, email, password_hash
+SELECT id, email, display_name, fullname, password_hash
 FROM users
 WHERE email = $1
 LIMIT 1
@@ -97,12 +97,20 @@ LIMIT 1
 type GetUserForLoginRow struct {
 	ID           int64  `json:"id"`
 	Email        string `json:"email"`
+	DisplayName  string `json:"display_name"`
+	Fullname     string `json:"fullname"`
 	PasswordHash string `json:"password_hash"`
 }
 
 func (q *Queries) GetUserForLogin(ctx context.Context, email string) (GetUserForLoginRow, error) {
 	row := q.db.QueryRow(ctx, getUserForLogin, email)
 	var i GetUserForLoginRow
-	err := row.Scan(&i.ID, &i.Email, &i.PasswordHash)
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.DisplayName,
+		&i.Fullname,
+		&i.PasswordHash,
+	)
 	return i, err
 }

@@ -12,7 +12,7 @@ RETURNING id, email, fullname, display_name, created_at;
 
 
 -- name: GetUserForLogin :one
-SELECT id, email, password_hash
+SELECT id, email, display_name, fullname, password_hash
 FROM users
 WHERE email = $1
 LIMIT 1;

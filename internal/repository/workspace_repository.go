@@ -26,8 +26,8 @@ func (r *WorkspaceRepository) CreateWorkspace(ctx context.Context, name string) 
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == "23505" {
-				switch {
-				case pgErr.ConstraintName == "workspaces_name_key":
+				switch pgErr.ConstraintName {
+				case "workspaces_name_key":
 					return sqlc.Workspace{}, ErrWorkspaceAlreadyExists
 				}
 			}

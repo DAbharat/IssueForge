@@ -9,8 +9,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-var ErrDuplicateProjectName = errors.New("a project with this name already exists for this user")
-
 type ProjectRepository struct {
 	queries *sqlc.Queries
 }
