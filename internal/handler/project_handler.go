@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"IssueForge/internal/auth"
 	"IssueForge/internal/dto"
 	"IssueForge/internal/httpx"
 	"IssueForge/internal/middleware"
@@ -17,9 +18,9 @@ import (
 )
 
 type ProjectService interface {
-	CreateProject(ctx context.Context, workspaceID, leadID int64, req dto.CreateProjectRequest) (dto.CreateProjectResponse, error)
+	CreateProject(ctx context.Context, leadID int64, req dto.CreateProjectRequest) (dto.CreateProjectResponse, error)
 	ListProjectByLead(ctx context.Context, leadID int64) ([]dto.ProjectResponse, error)
-	ListProjectsByWorkspace(ctx context.Context, workspaceID int64) ([]dto.ProjectResponse, error)
+	ListProjectsByWorkspace(ctx context.Context, workspaceID, userID int64) ([]dto.ProjectResponse, error)
 }
 
 type ProjectHandler struct {
@@ -54,15 +55,7 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vars := mux.Vars(r)
-
-	workspaceID, err := strconv.ParseInt(vars["workspaceID"], 10, 64)
-	if err != nil {
-		httpx.RespondWithError(w, http.StatusBadRequest, "invalid workspace id")
-		return
-	}
-
-	project, err := h.projectService.CreateProject(r.Context(), workspaceID, leadID, req)
+	project, err := h.projectService.CreateProject(r.Context(), leadID, req)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidProjectName),
@@ -104,10 +97,21 @@ func (h *ProjectHandler) ListProjectsByWorkspace(w http.ResponseWriter, r *http.
 		return
 	}
 
-	projects, err := h.projectService.ListProjectsByWorkspace(r.Context(), workspaceID)
+	userID, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	projects, err := h.projectService.ListProjectsByWorkspace(r.Context(), workspaceID, userID)
 	if err != nil {
-		log.Printf("list project by workspace fail: %v", err)
-		httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		switch {
+		case errors.Is(err, auth.ErrForbidden):
+			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
+		default:
+			log.Printf("list project by workspace fail: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		}
 		return
 	}
 	httpx.RespondWithJSON(w, http.StatusOK, projects)

@@ -59,6 +59,26 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (C
 	return i, err
 }
 
+const isProjectLead = `-- name: IsProjectLead :one
+SELECT EXISTS (
+    SELECT 1
+    FROM projects
+    WHERE id = $1 AND lead_id = $2
+)
+`
+
+type IsProjectLeadParams struct {
+	ID     int64 `json:"id"`
+	LeadID int64 `json:"lead_id"`
+}
+
+func (q *Queries) IsProjectLead(ctx context.Context, arg IsProjectLeadParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isProjectLead, arg.ID, arg.LeadID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const listProjectsByLead = `-- name: ListProjectsByLead :many
 SELECT id, workspace_id, lead_id, name, description, created_at, updated_at
 FROM projects

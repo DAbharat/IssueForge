@@ -16,12 +16,14 @@ type ProjectMemberRepo interface {
 }
 
 type ProjectMemberService struct {
-	repo ProjectMemberRepo
+	repo  ProjectMemberRepo
+	authz AuthzService
 }
 
-func NewProjectMemberService(repo ProjectMemberRepo) *ProjectMemberService {
+func NewProjectMemberService(repo ProjectMemberRepo, authz AuthzService) *ProjectMemberService {
 	return &ProjectMemberService{
-		repo: repo,
+		repo:  repo,
+		authz: authz,
 	}
 }
 
@@ -46,7 +48,11 @@ func (s *ProjectMemberService) AddMemberToProject(ctx context.Context, req dto.A
 	}, nil
 }
 
-func (s *ProjectMemberService) ListProjectMembers(ctx context.Context, projectID int64) ([]dto.ProjectMemberSummary, error) {
+func (s *ProjectMemberService) ListProjectMembers(ctx context.Context, projectID, userID int64) ([]dto.ProjectMemberSummary, error) {
+	if err := s.authz.RequireProjectMember(ctx, projectID, userID); err != nil {
+		return nil, err
+	}
+
 	members, err := s.repo.ListProjectMembers(ctx, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("list project members: %w", err)
@@ -67,6 +73,10 @@ func (s *ProjectMemberService) ListProjectMembers(ctx context.Context, projectID
 }
 
 func (s *ProjectMemberService) SafeAddMemberToProject(ctx context.Context, req dto.AddProjectMemberRequest, leadID int64) (dto.ProjectMemberResponse, error) {
+	if err := s.authz.RequireProjectLead(ctx, req.ProjectID, leadID); err != nil {
+		return dto.ProjectMemberResponse{}, err
+	}
+
 	member, err := s.repo.SafeAddMemberToProject(ctx, req.ProjectID, req.UserID, leadID)
 	if err != nil {
 		if errors.Is(err, repository.ErrProjectMemberValidationFailed) {

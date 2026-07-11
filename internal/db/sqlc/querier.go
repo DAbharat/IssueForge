@@ -19,6 +19,8 @@ type Querier interface {
 	GetWorkspaceByID(ctx context.Context, id int64) (Workspace, error)
 	GetWorkspaceByName(ctx context.Context, name string) (Workspace, error)
 	GetWorkspaceMember(ctx context.Context, arg GetWorkspaceMemberParams) (GetWorkspaceMemberRow, error)
+	IsProjectLead(ctx context.Context, arg IsProjectLeadParams) (bool, error)
+	IsProjectMember(ctx context.Context, arg IsProjectMemberParams) (bool, error)
 	IsWorkspaceMember(ctx context.Context, arg IsWorkspaceMemberParams) (UserRole, error)
 	ListProjectMembers(ctx context.Context, projectID int64) ([]ListProjectMembersRow, error)
 	ListProjectsByLead(ctx context.Context, leadID int64) ([]Project, error)

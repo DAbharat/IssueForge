@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"IssueForge/internal/auth"
 	"IssueForge/internal/dto"
 	"IssueForge/internal/httpx"
+	"IssueForge/internal/middleware"
 	"IssueForge/internal/repository"
 	"IssueForge/internal/service"
 	"context"
@@ -18,7 +20,7 @@ import (
 
 type WorkspaceService interface {
 	CreateWorkspace(ctx context.Context, req dto.CreateWorkspaceRequest) (dto.CreateWorkspaceResponse, error)
-	GetWorkspaceByID(ctx context.Context, id int64) (dto.WorkspaceResponse, error)
+	GetWorkspaceByID(ctx context.Context, workspaceID, userID int64) (dto.WorkspaceResponse, error)
 	GetWorkspaceByName(ctx context.Context, name string) (dto.WorkspaceResponse, error)
 }
 
@@ -67,15 +69,23 @@ func (h *WorkspaceHandler) CreateWorkspace(w http.ResponseWriter, r *http.Reques
 func (h *WorkspaceHandler) GetWorkspaceByID(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
+	userID, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	workspaceID, err := strconv.ParseInt(vars["workspaceID"], 10, 64)
 	if err != nil {
 		httpx.RespondWithError(w, http.StatusBadRequest, "invalid workspace id")
 		return
 	}
 
-	workspace, err := h.workspaceService.GetWorkspaceByID(r.Context(), workspaceID)
+	workspace, err := h.workspaceService.GetWorkspaceByID(r.Context(), workspaceID, userID)
 	if err != nil {
 		switch {
+		case errors.Is(err, auth.ErrForbidden):
+			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, repository.ErrWorkspaceNotFound):
 			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
 		default:

@@ -12,17 +12,19 @@ import (
 
 type WorkspaceRepo interface {
 	CreateWorkspace(ctx context.Context, name string) (sqlc.Workspace, error)
-	GetWorkspaceByID(ctx context.Context, id int64) (sqlc.Workspace, error)
+	GetWorkspaceByID(ctx context.Context, workspaceID, userID int64) (sqlc.Workspace, error)
 	GetWorkspaceByName(ctx context.Context, name string) (sqlc.Workspace, error)
 }
 
 type WorkspaceService struct {
-	repo WorkspaceRepo
+	repo  WorkspaceRepo
+	authz AuthzService
 }
 
-func NewWorkspaceService(repo WorkspaceRepo) *WorkspaceService {
+func NewWorkspaceService(repo WorkspaceRepo, authz AuthzService) *WorkspaceService {
 	return &WorkspaceService{
-		repo: repo,
+		repo:  repo,
+		authz: authz,
 	}
 }
 
@@ -45,8 +47,12 @@ func (s *WorkspaceService) CreateWorkspace(ctx context.Context, req dto.CreateWo
 	}, nil
 }
 
-func (s *WorkspaceService) GetWorkspaceByID(ctx context.Context, id int64) (dto.WorkspaceResponse, error) {
-	workspace, err := s.repo.GetWorkspaceByID(ctx, id)
+func (s *WorkspaceService) GetWorkspaceByID(ctx context.Context, workspaceID, userID int64) (dto.WorkspaceResponse, error) {
+	if err := s.authz.RequireWorkspaceMember(ctx, workspaceID, userID); err != nil {
+		return dto.WorkspaceResponse{}, err
+	}
+
+	workspace, err := s.repo.GetWorkspaceByID(ctx, workspaceID, userID)
 	if err != nil {
 		if errors.Is(err, repository.ErrWorkspaceNotFound) {
 			return dto.WorkspaceResponse{}, ErrWorkspaceNotFound

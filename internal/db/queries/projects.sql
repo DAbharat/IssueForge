@@ -23,3 +23,11 @@ SELECT id, workspace_id, lead_id, name, description, created_at, updated_at
 FROM projects
 WHERE lead_id = $1
 ORDER BY created_at DESC;
+
+
+-- name: IsProjectLead :one
+SELECT EXISTS (
+    SELECT 1
+    FROM projects
+    WHERE id = $1 AND lead_id = $2
+);

@@ -34,6 +34,26 @@ func (q *Queries) AddMemberToProject(ctx context.Context, arg AddMemberToProject
 	return i, err
 }
 
+const isProjectMember = `-- name: IsProjectMember :one
+SELECT EXISTS (
+    SELECT 1
+    FROM project_members
+    WHERE project_id = $1 AND user_id = $2
+)
+`
+
+type IsProjectMemberParams struct {
+	ProjectID int64 `json:"project_id"`
+	UserID    int64 `json:"user_id"`
+}
+
+func (q *Queries) IsProjectMember(ctx context.Context, arg IsProjectMemberParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isProjectMember, arg.ProjectID, arg.UserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const listProjectMembers = `-- name: ListProjectMembers :many
 SELECT u.id, u.email, u.fullname, u.display_name, pm.joined_at
 FROM project_members pm

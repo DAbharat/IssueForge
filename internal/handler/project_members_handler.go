@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"IssueForge/internal/auth"
 	"IssueForge/internal/dto"
 	"IssueForge/internal/httpx"
 	"IssueForge/internal/middleware"
@@ -16,8 +17,8 @@ import (
 
 type ProjectMemberService interface {
 	AddMemberToProject(ctx context.Context, req dto.AddProjectMemberRequest) (dto.ProjectMemberResponse, error)
-	ListProjectMembers(ctx context.Context, projectID int64) ([]dto.ProjectMemberSummary, error)
-	SafeAddMemberToProject(ctx context.Context, projectID, userID, leadID int64) (dto.ProjectMemberResponse, error)
+	ListProjectMembers(ctx context.Context, projectID, userID int64) ([]dto.ProjectMemberSummary, error)
+	SafeAddMemberToProject(ctx context.Context, req dto.AddProjectMemberRequest, leadID int64) (dto.ProjectMemberResponse, error)
 }
 
 type ProjectMemberHandler struct {
@@ -51,9 +52,16 @@ func (h *ProjectMemberHandler) SafeAddMemberToProject(w http.ResponseWriter, r *
 		return
 	}
 
-	member, err := h.projectMemberService.SafeAddMemberToProject(r.Context(), projectID, userID, leadID)
+	req := dto.AddProjectMemberRequest{
+		ProjectID: projectID,
+		UserID:    userID,
+	}
+
+	member, err := h.projectMemberService.SafeAddMemberToProject(r.Context(), req, leadID)
 	if err != nil {
 		switch {
+		case errors.Is(err, auth.ErrForbidden):
+			httpx.RespondWithError(w, http.StatusUnauthorized, err.Error())
 		case errors.Is(err, repository.ErrProjectMemberValidationFailed):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, repository.ErrProjectMemberAlreadyExists):
@@ -71,6 +79,12 @@ func (h *ProjectMemberHandler) SafeAddMemberToProject(w http.ResponseWriter, r *
 }
 
 func (h *ProjectMemberHandler) ListProjectMembers(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	vars := mux.Vars(r)
 
 	projectID, err := strconv.ParseInt(vars["projectID"], 10, 64)
@@ -79,13 +93,13 @@ func (h *ProjectMemberHandler) ListProjectMembers(w http.ResponseWriter, r *http
 		return
 	}
 
-	members, err := h.projectMemberService.ListProjectMembers(r.Context(), projectID)
+	members, err := h.projectMemberService.ListProjectMembers(r.Context(), projectID, userID)
 	if err != nil {
 		switch {
-		case errors.Is(err, repository.ErrProjectMemberValidationFailed):
+		case errors.Is(err, auth.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		default:
-			log.Printf("list project by members ffail: %v", err)
+			log.Printf("list project by members fail: %v", err)
 			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		}
 		return

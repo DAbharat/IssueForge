@@ -33,3 +33,11 @@ FROM project_members pm
 JOIN users u ON pm.user_id = u.id
 WHERE pm.project_id = $1
 ORDER BY pm.joined_at ASC;
+
+
+-- name: IsProjectMember :one
+SELECT EXISTS (
+    SELECT 1
+    FROM project_members
+    WHERE project_id = $1 AND user_id = $2
+);

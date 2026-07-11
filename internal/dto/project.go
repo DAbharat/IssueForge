@@ -3,6 +3,7 @@ package dto
 type CreateProjectRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	WorkspaceID int64  `json:"workspace_id"`
 }
 
 type CreateProjectResponse struct {

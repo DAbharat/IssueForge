@@ -17,15 +17,21 @@ type ProjectRepo interface {
 
 type ProjectService struct {
 	projectRepo ProjectRepo
+	authz       AuthzService
 }
 
-func NewProjectService(repo ProjectRepo) *ProjectService {
+func NewProjectService(repo ProjectRepo, authz AuthzService) *ProjectService {
 	return &ProjectService{
 		projectRepo: repo,
+		authz:       authz,
 	}
 }
 
-func (s *ProjectService) CreateProject(ctx context.Context, workspaceID int64, leadID int64, req dto.CreateProjectRequest) (dto.CreateProjectResponse, error) {
+func (s *ProjectService) CreateProject(ctx context.Context, leadID int64, req dto.CreateProjectRequest) (dto.CreateProjectResponse, error) {
+	if err := s.authz.RequireWorkspaceMember(ctx, req.WorkspaceID, leadID); err != nil {
+		return dto.CreateProjectResponse{}, err
+	}
+
 	projectName := strings.TrimSpace(req.Name)
 	projectDesc := strings.TrimSpace(req.Description)
 
@@ -37,7 +43,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, workspaceID int64, l
 		return dto.CreateProjectResponse{}, ErrInvalidDescription
 	}
 
-	project, err := s.projectRepo.CreateProject(ctx, workspaceID, leadID, projectName, projectDesc)
+	project, err := s.projectRepo.CreateProject(ctx, req.WorkspaceID, leadID, projectName, projectDesc)
 	if err != nil {
 		if errors.Is(err, ErrProjectNameTaken) {
 			return dto.CreateProjectResponse{}, err
@@ -74,7 +80,11 @@ func (s *ProjectService) ListProjectsByLead(ctx context.Context, leadID int64) (
 	return projects, nil
 }
 
-func (s *ProjectService) ListProjectsByWorkspace(ctx context.Context, workspaceID int64) ([]dto.ProjectResponse, error) {
+func (s *ProjectService) ListProjectsByWorkspace(ctx context.Context, workspaceID, userID int64) ([]dto.ProjectResponse, error) {
+	if err := s.authz.RequireWorkspaceMember(ctx, workspaceID, userID); err != nil {
+		return nil, err
+	}
+
 	workspaceProjects, err := s.projectRepo.ListProjectsByWorkspace(ctx, workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("list projects by workspaces: %w", err)
