@@ -7,28 +7,35 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 )
 
 type WorkspaceRepo interface {
 	CreateWorkspace(ctx context.Context, name string) (sqlc.Workspace, error)
-	GetWorkspaceByID(ctx context.Context, workspaceID, userID int64) (sqlc.Workspace, error)
+	GetWorkspaceByID(ctx context.Context, workspaceID int64) (sqlc.Workspace, error)
 	GetWorkspaceByName(ctx context.Context, name string) (sqlc.Workspace, error)
 }
 
-type WorkspaceService struct {
-	repo  WorkspaceRepo
-	authz AuthzService
+type WorkspaceMemRepo interface {
+	AddWorkspaceMember(ctx context.Context, workspaceID, userID int64, role string) (sqlc.WorkspaceMember, error)
 }
 
-func NewWorkspaceService(repo WorkspaceRepo, authz AuthzService) *WorkspaceService {
+type WorkspaceService struct {
+	repo                WorkspaceRepo
+	authz               AuthzService
+	workspaceMemberRepo WorkspaceMemRepo
+}
+
+func NewWorkspaceService(repo WorkspaceRepo, workspaceMemRepo WorkspaceMemRepo, authz AuthzService) *WorkspaceService {
 	return &WorkspaceService{
-		repo:  repo,
-		authz: authz,
+		repo:                repo,
+		workspaceMemberRepo: workspaceMemRepo,
+		authz:               authz,
 	}
 }
 
-func (s *WorkspaceService) CreateWorkspace(ctx context.Context, req dto.CreateWorkspaceRequest) (dto.CreateWorkspaceResponse, error) {
+func (s *WorkspaceService) CreateWorkspace(ctx context.Context, creatorID int64, req dto.CreateWorkspaceRequest) (dto.CreateWorkspaceResponse, error) {
 	workspaceName := strings.TrimSpace(req.Name)
 	if len(workspaceName) < 3 || len(workspaceName) > 30 {
 		return dto.CreateWorkspaceResponse{}, ErrInvalidWorkspaceName
@@ -41,6 +48,14 @@ func (s *WorkspaceService) CreateWorkspace(ctx context.Context, req dto.CreateWo
 		}
 		return dto.CreateWorkspaceResponse{}, fmt.Errorf("create workspace: %w", err)
 	}
+
+	log.Println("adding creator as an admin")
+	member, err := s.workspaceMemberRepo.AddWorkspaceMember(ctx, workspace.ID, creatorID, "ADMIN")
+	if err != nil {
+		return dto.CreateWorkspaceResponse{}, fmt.Errorf("add creator to workspace: %w", err)
+	}
+	log.Printf("member=%+v err=%v", member, err)
+
 	return dto.CreateWorkspaceResponse{
 		ID:   workspace.ID,
 		Name: workspace.Name,
@@ -52,7 +67,7 @@ func (s *WorkspaceService) GetWorkspaceByID(ctx context.Context, workspaceID, us
 		return dto.WorkspaceResponse{}, err
 	}
 
-	workspace, err := s.repo.GetWorkspaceByID(ctx, workspaceID, userID)
+	workspace, err := s.repo.GetWorkspaceByID(ctx, workspaceID)
 	if err != nil {
 		if errors.Is(err, repository.ErrWorkspaceNotFound) {
 			return dto.WorkspaceResponse{}, ErrWorkspaceNotFound

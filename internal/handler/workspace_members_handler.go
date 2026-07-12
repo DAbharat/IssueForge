@@ -21,7 +21,7 @@ import (
 type WorkspaceMemberService interface {
 	AddWorkspaceMember(ctx context.Context, adminID int64, req dto.AddWorkspaceMemberRequest) (dto.WorkspaceMemberResponse, error)
 	GetWorkspaceMember(ctx context.Context, workspaceID, requesterID, targetUserID int64) (dto.WorkspaceMemberSummary, error)
-	ListUserWorkspaces(ctx context.Context, userID int64) ([]dto.WorkspaceSummary, error)
+	ListUserWorkspaces(ctx context.Context, userID int64, search string) ([]dto.WorkspaceSummary, error)
 	ListWorkspaceMembers(ctx context.Context, workspaceID, userID int64) ([]dto.WorkspaceMemberDetails, error)
 	RemoveWorkspaceMember(ctx context.Context, workspaceID, adminID, userID int64) (dto.RemoveWorkspaceMemberResponse, error)
 }
@@ -125,7 +125,9 @@ func (h *WorkspaceMemberHandler) ListUserWorkspaces(w http.ResponseWriter, r *ht
 		return
 	}
 
-	member, err := h.workspaceMemberService.ListUserWorkspaces(r.Context(), userID)
+	search := r.URL.Query().Get("search")
+
+	member, err := h.workspaceMemberService.ListUserWorkspaces(r.Context(), userID, search)
 	if err != nil {
 		log.Printf("list user workspaces fail: %v", err)
 		httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")

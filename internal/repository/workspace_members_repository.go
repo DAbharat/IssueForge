@@ -20,11 +20,11 @@ func NewWorkspaceMemberRepository(queries *sqlc.Queries) *WorkspaceMemberReposit
 	}
 }
 
-func (r *WorkspaceMemberRepository) AddWorkspaceMember(ctx context.Context, workspaceID, userID int64, role sqlc.UserRole) (sqlc.WorkspaceMember, error) {
+func (r *WorkspaceMemberRepository) AddWorkspaceMember(ctx context.Context, workspaceID, userID int64, role string) (sqlc.WorkspaceMember, error) {
 	params := sqlc.AddWorkspaceMemberParams{
 		WorkspaceID: workspaceID,
 		UserID:      userID,
-		Role:        role,
+		Role:        sqlc.UserRole(role),
 	}
 
 	member, err := r.queries.AddWorkspaceMember(ctx, params)
@@ -83,8 +83,13 @@ func (r *WorkspaceMemberRepository) IsWorkspaceMember(ctx context.Context, works
 	return role, nil
 }
 
-func (r *WorkspaceMemberRepository) ListUserWorkspaces(ctx context.Context, userID int64) ([]sqlc.ListUserWorkspacesRow, error) {
-	workspaces, err := r.queries.ListUserWorkspaces(ctx, userID)
+func (r *WorkspaceMemberRepository) ListUserWorkspaces(ctx context.Context, userID int64, search string) ([]sqlc.ListUserWorkspacesRow, error) {
+	params := sqlc.ListUserWorkspacesParams{
+		UserID: userID,
+		Search: &search,
+	}
+
+	workspaces, err := r.queries.ListUserWorkspaces(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("list user workspaces: %w", err)
 	}

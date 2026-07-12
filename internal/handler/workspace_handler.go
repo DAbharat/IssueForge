@@ -19,7 +19,7 @@ import (
 )
 
 type WorkspaceService interface {
-	CreateWorkspace(ctx context.Context, req dto.CreateWorkspaceRequest) (dto.CreateWorkspaceResponse, error)
+	CreateWorkspace(ctx context.Context, creatorID int64, req dto.CreateWorkspaceRequest) (dto.CreateWorkspaceResponse, error)
 	GetWorkspaceByID(ctx context.Context, workspaceID, userID int64) (dto.WorkspaceResponse, error)
 	GetWorkspaceByName(ctx context.Context, name string) (dto.WorkspaceResponse, error)
 }
@@ -50,7 +50,13 @@ func (h *WorkspaceHandler) CreateWorkspace(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	workspace, err := h.workspaceService.CreateWorkspace(r.Context(), req)
+	creatorID, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	workspace, err := h.workspaceService.CreateWorkspace(r.Context(), creatorID, req)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidWorkspaceName):

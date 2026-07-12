@@ -10,10 +10,10 @@ import (
 )
 
 type WorkspaceMemberRepos interface {
-	AddWorkspaceMember(ctx context.Context, workspaceID, userID int64, role sqlc.UserRole) (sqlc.WorkspaceMember, error)
+	AddWorkspaceMember(ctx context.Context, workspaceID, userID int64, role string) (sqlc.WorkspaceMember, error)
 	GetWorkspaceMember(ctx context.Context, workspaceID, targetUserID int64) (sqlc.GetWorkspaceMemberRow, error)
 	IsWorkspaceMember(ctx context.Context, workspaceID, userID int64) (sqlc.UserRole, error)
-	ListUserWorkspaces(ctx context.Context, userID int64) ([]sqlc.ListUserWorkspacesRow, error)
+	ListUserWorkspaces(ctx context.Context, userID int64, search string) ([]sqlc.ListUserWorkspacesRow, error)
 	ListWorkspaceMembers(ctx context.Context, workspaceID int64) ([]sqlc.ListWorkspaceMembersRow, error)
 	RemoveWorkspaceMember(ctx context.Context, workspaceID, userID int64) (sqlc.RemoveWorkspaceMemberRow, error)
 }
@@ -35,7 +35,7 @@ func (s *WorkspaceMemberService) AddWorkspaceMember(ctx context.Context, adminID
 		return dto.WorkspaceMemberResponse{}, err
 	}
 
-	member, err := s.repo.AddWorkspaceMember(ctx, req.WorkspaceID, req.UserID, sqlc.UserRole(req.Role))
+	member, err := s.repo.AddWorkspaceMember(ctx, req.WorkspaceID, req.UserID, req.Role)
 	if err != nil {
 		if errors.Is(err, repository.ErrWorkspaceMemberAlreadyExists) {
 			return dto.WorkspaceMemberResponse{}, ErrWorkspaceMemberAlreadyExists
@@ -89,8 +89,8 @@ func (s *WorkspaceMemberService) IsWorkspaceMember(ctx context.Context, workspac
 	return sqlc.UserRole(member), nil
 }
 
-func (s *WorkspaceMemberService) ListUserWorkspaces(ctx context.Context, userID int64) ([]dto.WorkspaceSummary, error) {
-	workspaces, err := s.repo.ListUserWorkspaces(ctx, userID)
+func (s *WorkspaceMemberService) ListUserWorkspaces(ctx context.Context, userID int64, search string) ([]dto.WorkspaceSummary, error) {
+	workspaces, err := s.repo.ListUserWorkspaces(ctx, userID, search)
 	if err != nil {
 		return nil, fmt.Errorf("user workspace details: %w", err)
 	}

@@ -38,6 +38,7 @@ func (h *UserHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&req); err != nil {
+		log.Printf("decode error: %v", err)
 		httpx.RespondWithError(w, http.StatusBadRequest, "invalid or oversized request body")
 		return
 	}

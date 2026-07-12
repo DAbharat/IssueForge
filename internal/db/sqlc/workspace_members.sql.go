@@ -103,8 +103,17 @@ SELECT w.id, w.name, wm.role
 FROM workspace_members wm
 JOIN workspaces w ON wm.workspace_id = w.id
 WHERE wm.user_id = $1
+AND (
+    $2 = ''
+    OR LOWER(w.name) LIKE '%' || LOWER($2) || '%'
+)
 ORDER BY w.name
 `
+
+type ListUserWorkspacesParams struct {
+	UserID int64       `json:"user_id"`
+	Search interface{} `json:"search"`
+}
 
 type ListUserWorkspacesRow struct {
 	ID   int64    `json:"id"`
@@ -112,8 +121,8 @@ type ListUserWorkspacesRow struct {
 	Role UserRole `json:"role"`
 }
 
-func (q *Queries) ListUserWorkspaces(ctx context.Context, userID int64) ([]ListUserWorkspacesRow, error) {
-	rows, err := q.db.Query(ctx, listUserWorkspaces, userID)
+func (q *Queries) ListUserWorkspaces(ctx context.Context, arg ListUserWorkspacesParams) ([]ListUserWorkspacesRow, error) {
+	rows, err := q.db.Query(ctx, listUserWorkspaces, arg.UserID, arg.Search)
 	if err != nil {
 		return nil, err
 	}

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/mail"
 
 	"golang.org/x/crypto/bcrypt"
@@ -23,7 +24,7 @@ type UserRepo interface {
 }
 
 type WorkspaceMemberRepo interface {
-	ListUserWorkspaces(ctx context.Context, userID int64) ([]sqlc.ListUserWorkspacesRow, error)
+	ListUserWorkspaces(ctx context.Context, userID int64, search string) ([]sqlc.ListUserWorkspacesRow, error)
 }
 
 type UserService struct {
@@ -117,7 +118,7 @@ func (s *UserService) Login(ctx context.Context, req dto.LoginUserRequest) (dto.
 		return dto.LoginUserResponse{}, fmt.Errorf("generate jwt: %w", err)
 	}
 
-	workspaces, err := s.workspaceMemberRepo.ListUserWorkspaces(ctx, user.ID)
+	workspaces, err := s.workspaceMemberRepo.ListUserWorkspaces(ctx, user.ID, "")
 	if err != nil {
 		return dto.LoginUserResponse{}, fmt.Errorf("get login workspaces: %w", err)
 	}
@@ -140,10 +141,11 @@ func (s *UserService) GetCurrentUser(ctx context.Context, userID int64) (dto.MeR
 		return dto.MeResponse{}, err
 	}
 
-	workspaces, err := s.workspaceMemberRepo.ListUserWorkspaces(ctx, userID)
+	workspaces, err := s.workspaceMemberRepo.ListUserWorkspaces(ctx, userID, "")
 	if err != nil {
 		return dto.MeResponse{}, fmt.Errorf("get user workspaces: %w", err)
 	}
+	log.Printf("%+v", workspaces)
 
 	return dto.MeResponse{
 		ID:          user.ID,

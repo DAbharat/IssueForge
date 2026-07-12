@@ -9,11 +9,15 @@ import (
 )
 
 func registerProjectRoutes(r *mux.Router, projectHandler *handler.ProjectHandler, authMiddleware *middleware.AuthMiddleware) {
-	r.Handle("/api/projects",
-		authMiddleware.Authenticate(http.HandlerFunc(projectHandler.Create)),
+	r.Handle("/api/workspaces/{workspaceID}/projects",
+		authMiddleware.Authenticate(http.HandlerFunc(projectHandler.CreateProject)),
 	).Methods("POST")
 
 	r.Handle("/api/projects",
-		authMiddleware.Authenticate(http.HandlerFunc(projectHandler.List)),
+		authMiddleware.Authenticate(http.HandlerFunc(projectHandler.ListProjectByLead)),
+	).Methods("GET")
+
+	r.Handle("/api/workspaces/{workspaceID}/projects",
+		authMiddleware.Authenticate(http.HandlerFunc(projectHandler.ListProjectsByWorkspace)),
 	).Methods("GET")
 }

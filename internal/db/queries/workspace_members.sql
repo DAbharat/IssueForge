@@ -44,5 +44,9 @@ AND user_id = $2;
 SELECT w.id, w.name, wm.role
 FROM workspace_members wm
 JOIN workspaces w ON wm.workspace_id = w.id
-WHERE wm.user_id = $1
+WHERE wm.user_id = sqlc.arg(user_id)
+AND (
+    sqlc.arg(search) = ''
+    OR LOWER(w.name) LIKE '%' || LOWER(sqlc.arg(search)) || '%'
+)
 ORDER BY w.name;

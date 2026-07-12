@@ -25,7 +25,7 @@ type Querier interface {
 	ListProjectMembers(ctx context.Context, projectID int64) ([]ListProjectMembersRow, error)
 	ListProjectsByLead(ctx context.Context, leadID int64) ([]Project, error)
 	ListProjectsByWorkspace(ctx context.Context, workspaceID int64) ([]Project, error)
-	ListUserWorkspaces(ctx context.Context, userID int64) ([]ListUserWorkspacesRow, error)
+	ListUserWorkspaces(ctx context.Context, arg ListUserWorkspacesParams) ([]ListUserWorkspacesRow, error)
 	ListWorkspaceMembers(ctx context.Context, workspaceID int64) ([]ListWorkspaceMembersRow, error)
 	RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) (RemoveWorkspaceMemberRow, error)
 	SafeAddMemberToProject(ctx context.Context, arg SafeAddMemberToProjectParams) (ProjectMember, error)

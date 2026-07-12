@@ -7,12 +7,15 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func New(userHandler *handler.UserHandler, projectHandler *handler.ProjectHandler, authMiddleware *middleware.AuthMiddleware) *mux.Router {
+func New(userHandler *handler.UserHandler, projectHandler *handler.ProjectHandler, projectMemberHandler *handler.ProjectMemberHandler, workspaceHandler *handler.WorkspaceHandler, workspaceMemberHandler *handler.WorkspaceMemberHandler, authMiddleware *middleware.AuthMiddleware) *mux.Router {
 	r := mux.NewRouter()
 
 	registerHealthRoutes(r)
 	registerUserRoutes(r, userHandler, authMiddleware)
 	registerProjectRoutes(r, projectHandler, authMiddleware)
+	registerProjectMembersRoutes(r, projectMemberHandler, authMiddleware)
+	registerWorkspaceRoutes(r, workspaceHandler, authMiddleware)
+	registerWorkspaceMemberRoutes(r, workspaceMemberHandler, authMiddleware)
 
 	return r
 }

@@ -19,7 +19,7 @@ import (
 
 type ProjectService interface {
 	CreateProject(ctx context.Context, leadID int64, req dto.CreateProjectRequest) (dto.CreateProjectResponse, error)
-	ListProjectByLead(ctx context.Context, leadID int64) ([]dto.ProjectResponse, error)
+	ListProjectsByLead(ctx context.Context, leadID int64) ([]dto.ProjectResponse, error)
 	ListProjectsByWorkspace(ctx context.Context, workspaceID, userID int64) ([]dto.ProjectResponse, error)
 }
 
@@ -36,6 +36,14 @@ func NewProjectHandler(service ProjectService) *ProjectHandler {
 func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
 
+	vars := mux.Vars(r)
+
+	workspaceID, err := strconv.ParseInt(vars["workspaceID"], 10, 64)
+	if err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, "invalid workspace id")
+		return
+	}
+
 	var req dto.CreateProjectRequest
 
 	decoder := json.NewDecoder(r.Body)
@@ -48,6 +56,8 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		httpx.RespondWithError(w, http.StatusBadRequest, "request body must contain a single JSON object")
 		return
 	}
+
+	req.WorkspaceID = workspaceID
 
 	leadID, ok := middleware.GetUserFromContext(r.Context())
 	if !ok {
@@ -79,7 +89,7 @@ func (h *ProjectHandler) ListProjectByLead(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	projects, err := h.projectService.ListProjectByLead(r.Context(), leadID)
+	projects, err := h.projectService.ListProjectsByLead(r.Context(), leadID)
 	if err != nil {
 		log.Printf("list project by lead fail: %v", err)
 		httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
