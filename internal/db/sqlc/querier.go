@@ -6,14 +6,19 @@ package sqlc
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
 	AddMemberToProject(ctx context.Context, arg AddMemberToProjectParams) (ProjectMember, error)
 	AddWorkspaceMember(ctx context.Context, arg AddWorkspaceMemberParams) (WorkspaceMember, error)
+	CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue, error)
 	CreateOnboardingUser(ctx context.Context, arg CreateOnboardingUserParams) (CreateOnboardingUserRow, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (CreateProjectRow, error)
 	CreateWorkspace(ctx context.Context, name string) (Workspace, error)
+	DeleteIssue(ctx context.Context, id int64) error
+	GetIssueByID(ctx context.Context, id int64) (GetIssueByIDRow, error)
 	GetUserByID(ctx context.Context, id int64) (GetUserByIDRow, error)
 	GetUserForLogin(ctx context.Context, email string) (GetUserForLoginRow, error)
 	GetWorkspaceByID(ctx context.Context, id int64) (Workspace, error)
@@ -22,6 +27,9 @@ type Querier interface {
 	IsProjectLead(ctx context.Context, arg IsProjectLeadParams) (bool, error)
 	IsProjectMember(ctx context.Context, arg IsProjectMemberParams) (bool, error)
 	IsWorkspaceMember(ctx context.Context, arg IsWorkspaceMemberParams) (UserRole, error)
+	ListAssignedIssues(ctx context.Context, assignedTo pgtype.Int8) ([]ListAssignedIssuesRow, error)
+	ListCreatedIssues(ctx context.Context, createdBy int64) ([]ListCreatedIssuesRow, error)
+	ListProjectIssues(ctx context.Context, projectID int64) ([]ListProjectIssuesRow, error)
 	ListProjectMembers(ctx context.Context, projectID int64) ([]ListProjectMembersRow, error)
 	ListProjectsByLead(ctx context.Context, leadID int64) ([]Project, error)
 	ListProjectsByWorkspace(ctx context.Context, workspaceID int64) ([]Project, error)
@@ -29,6 +37,9 @@ type Querier interface {
 	ListWorkspaceMembers(ctx context.Context, workspaceID int64) ([]ListWorkspaceMembersRow, error)
 	RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) (RemoveWorkspaceMemberRow, error)
 	SafeAddMemberToProject(ctx context.Context, arg SafeAddMemberToProjectParams) (ProjectMember, error)
+	UpdateIssueAssignee(ctx context.Context, arg UpdateIssueAssigneeParams) (Issue, error)
+	UpdateIssueDetails(ctx context.Context, arg UpdateIssueDetailsParams) (Issue, error)
+	UpdateIssueStatus(ctx context.Context, arg UpdateIssueStatusParams) (Issue, error)
 }
 
 var _ Querier = (*Queries)(nil)

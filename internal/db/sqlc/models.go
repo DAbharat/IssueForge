@@ -11,6 +11,92 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type IssuePriority string
+
+const (
+	IssuePriorityLOW    IssuePriority = "LOW"
+	IssuePriorityMEDIUM IssuePriority = "MEDIUM"
+	IssuePriorityHIGH   IssuePriority = "HIGH"
+)
+
+func (e *IssuePriority) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = IssuePriority(s)
+	case string:
+		*e = IssuePriority(s)
+	default:
+		return fmt.Errorf("unsupported scan type for IssuePriority: %T", src)
+	}
+	return nil
+}
+
+type NullIssuePriority struct {
+	IssuePriority IssuePriority `json:"issue_priority"`
+	Valid         bool          `json:"valid"` // Valid is true if IssuePriority is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullIssuePriority) Scan(value interface{}) error {
+	if value == nil {
+		ns.IssuePriority, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.IssuePriority.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullIssuePriority) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.IssuePriority), nil
+}
+
+type IssueStatus string
+
+const (
+	IssueStatusTODO       IssueStatus = "TODO"
+	IssueStatusINPROGRESS IssueStatus = "IN_PROGRESS"
+	IssueStatusDONE       IssueStatus = "DONE"
+)
+
+func (e *IssueStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = IssueStatus(s)
+	case string:
+		*e = IssueStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for IssueStatus: %T", src)
+	}
+	return nil
+}
+
+type NullIssueStatus struct {
+	IssueStatus IssueStatus `json:"issue_status"`
+	Valid       bool        `json:"valid"` // Valid is true if IssueStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullIssueStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.IssueStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.IssueStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullIssueStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.IssueStatus), nil
+}
+
 type UserRole string
 
 const (
@@ -51,6 +137,19 @@ func (ns NullUserRole) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.UserRole), nil
+}
+
+type Issue struct {
+	ID          int64              `json:"id"`
+	ProjectID   int64              `json:"project_id"`
+	CreatedBy   int64              `json:"created_by"`
+	AssignedTo  pgtype.Int8        `json:"assigned_to"`
+	Title       string             `json:"title"`
+	Description pgtype.Text        `json:"description"`
+	Status      IssueStatus        `json:"status"`
+	Priority    IssuePriority      `json:"priority"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Project struct {
