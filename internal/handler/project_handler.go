@@ -64,6 +64,7 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
+	log.Printf("workspaceID=%d leadID=%d", workspaceID, leadID)
 
 	project, err := h.projectService.CreateProject(r.Context(), leadID, req)
 	if err != nil {

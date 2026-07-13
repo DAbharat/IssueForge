@@ -7,14 +7,17 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type ProjectRepository struct {
+	db      *pgxpool.Pool
 	queries *sqlc.Queries
 }
 
-func NewProjectRepository(queries *sqlc.Queries) *ProjectRepository {
+func NewProjectRepository(db *pgxpool.Pool, queries *sqlc.Queries) *ProjectRepository {
 	return &ProjectRepository{
+		db:      db,
 		queries: queries,
 	}
 }
@@ -27,7 +30,17 @@ func (r *ProjectRepository) CreateProject(ctx context.Context, workspaceID, lead
 		Description: description,
 	}
 
-	project, err := r.queries.CreateProject(ctx, params)
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return sqlc.CreateProjectRow{}, fmt.Errorf("create project transaction: %v", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	qtx := r.queries.WithTx(tx)
+
+	project, err := qtx.CreateProject(ctx, params)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -47,6 +60,18 @@ func (r *ProjectRepository) CreateProject(ctx context.Context, workspaceID, lead
 			}
 		}
 		return sqlc.CreateProjectRow{}, fmt.Errorf("create project: %w", err)
+	}
+
+	_, err = qtx.AddMemberToProject(ctx, sqlc.AddMemberToProjectParams{
+		ProjectID: project.ID,
+		UserID:    leadID,
+	})
+	if err != nil {
+		return sqlc.CreateProjectRow{}, fmt.Errorf("commit transaction: %v", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return sqlc.CreateProjectRow{}, fmt.Errorf("commit transaction: %w", err)
 	}
 
 	return project, nil

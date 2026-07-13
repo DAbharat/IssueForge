@@ -7,7 +7,9 @@ import (
 	"IssueForge/internal/middleware"
 	"IssueForge/internal/repository"
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -16,9 +18,9 @@ import (
 )
 
 type ProjectMemberService interface {
-	AddMemberToProject(ctx context.Context, req dto.AddProjectMemberRequest) (dto.ProjectMemberResponse, error)
+	AddMemberToProject(ctx context.Context, projectID, leadID int64, req dto.AddProjectMemberRequest) (dto.ProjectMemberResponse, error)
 	ListProjectMembers(ctx context.Context, projectID, userID int64) ([]dto.ProjectMemberSummary, error)
-	SafeAddMemberToProject(ctx context.Context, req dto.AddProjectMemberRequest, leadID int64) (dto.ProjectMemberResponse, error)
+	SafeAddMemberToProject(ctx context.Context, req dto.AddProjectMemberRequest, projectID, leadID int64) (dto.ProjectMemberResponse, error)
 }
 
 type ProjectMemberHandler struct {
@@ -32,6 +34,19 @@ func NewProjectMemberHandler(service ProjectMemberService) *ProjectMemberHandler
 }
 
 func (h *ProjectMemberHandler) SafeAddMemberToProject(w http.ResponseWriter, r *http.Request) {
+	var req dto.AddProjectMemberRequest
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, "invalid or oversized request body")
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		httpx.RespondWithError(w, http.StatusBadRequest, "request body must contain a single JSON object")
+		return
+	}
+
 	leadID, ok := middleware.GetUserFromContext(r.Context())
 	if !ok {
 		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
@@ -40,24 +55,13 @@ func (h *ProjectMemberHandler) SafeAddMemberToProject(w http.ResponseWriter, r *
 
 	vars := mux.Vars(r)
 
-	userID, err := strconv.ParseInt(vars["userID"], 10, 64)
-	if err != nil {
-		httpx.RespondWithError(w, http.StatusBadRequest, "invalid user id")
-		return
-	}
-
 	projectID, err := strconv.ParseInt(vars["projectID"], 10, 64)
 	if err != nil {
 		httpx.RespondWithError(w, http.StatusBadRequest, "invalid project id")
 		return
 	}
 
-	req := dto.AddProjectMemberRequest{
-		ProjectID: projectID,
-		UserID:    userID,
-	}
-
-	member, err := h.projectMemberService.SafeAddMemberToProject(r.Context(), req, leadID)
+	member, err := h.projectMemberService.SafeAddMemberToProject(r.Context(), req, projectID, leadID)
 	if err != nil {
 		switch {
 		case errors.Is(err, auth.ErrForbidden):
@@ -87,6 +91,7 @@ func (h *ProjectMemberHandler) ListProjectMembers(w http.ResponseWriter, r *http
 
 	vars := mux.Vars(r)
 
+	log.Printf("vars = %+v", vars)
 	projectID, err := strconv.ParseInt(vars["projectID"], 10, 64)
 	if err != nil {
 		httpx.RespondWithError(w, http.StatusBadRequest, "invalid project id")

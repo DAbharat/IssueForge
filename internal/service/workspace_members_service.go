@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 )
 
 type WorkspaceMemberRepos interface {
@@ -30,12 +31,12 @@ func NewWorkspaceMemberService(repo WorkspaceMemberRepos, authz AuthzService) *W
 	}
 }
 
-func (s *WorkspaceMemberService) AddWorkspaceMember(ctx context.Context, adminID int64, req dto.AddWorkspaceMemberRequest) (dto.WorkspaceMemberResponse, error) {
-	if err := s.authz.RequireWorkspaceAdmin(ctx, req.WorkspaceID, adminID); err != nil {
+func (s *WorkspaceMemberService) AddWorkspaceMember(ctx context.Context, adminID, workspaceID int64, req dto.AddWorkspaceMemberRequest) (dto.WorkspaceMemberResponse, error) {
+	if err := s.authz.RequireWorkspaceAdmin(ctx, workspaceID, adminID); err != nil {
 		return dto.WorkspaceMemberResponse{}, err
 	}
 
-	member, err := s.repo.AddWorkspaceMember(ctx, req.WorkspaceID, req.UserID, req.Role)
+	member, err := s.repo.AddWorkspaceMember(ctx, workspaceID, req.UserID, req.Role)
 	if err != nil {
 		if errors.Is(err, repository.ErrWorkspaceMemberAlreadyExists) {
 			return dto.WorkspaceMemberResponse{}, ErrWorkspaceMemberAlreadyExists
@@ -48,6 +49,7 @@ func (s *WorkspaceMemberService) AddWorkspaceMember(ctx context.Context, adminID
 		}
 		return dto.WorkspaceMemberResponse{}, fmt.Errorf("add workspace member: %w", err)
 	}
+	log.Printf("add member: %v", member)
 	return dto.WorkspaceMemberResponse{
 		WorkspaceID: member.WorkspaceID,
 		UserID:      member.UserID,

@@ -27,8 +27,8 @@ func NewProjectMemberService(repo ProjectMemberRepo, authz AuthzService) *Projec
 	}
 }
 
-func (s *ProjectMemberService) AddMemberToProject(ctx context.Context, req dto.AddProjectMemberRequest) (dto.ProjectMemberResponse, error) {
-	member, err := s.repo.AddMemberToProject(ctx, req.ProjectID, req.UserID)
+func (s *ProjectMemberService) AddMemberToProject(ctx context.Context, projectID, userID int64, req dto.AddProjectMemberRequest) (dto.ProjectMemberResponse, error) {
+	member, err := s.repo.AddMemberToProject(ctx, projectID, userID)
 	if err != nil {
 		if errors.Is(err, repository.ErrProjectMemberAlreadyExists) {
 			return dto.ProjectMemberResponse{}, ErrProjectMemberAlreadyExists
@@ -72,12 +72,12 @@ func (s *ProjectMemberService) ListProjectMembers(ctx context.Context, projectID
 	return result, nil
 }
 
-func (s *ProjectMemberService) SafeAddMemberToProject(ctx context.Context, req dto.AddProjectMemberRequest, leadID int64) (dto.ProjectMemberResponse, error) {
-	if err := s.authz.RequireProjectLead(ctx, req.ProjectID, leadID); err != nil {
+func (s *ProjectMemberService) SafeAddMemberToProject(ctx context.Context, req dto.AddProjectMemberRequest, projectID, leadID int64) (dto.ProjectMemberResponse, error) {
+	if err := s.authz.RequireProjectLead(ctx, projectID, leadID); err != nil {
 		return dto.ProjectMemberResponse{}, err
 	}
 
-	member, err := s.repo.SafeAddMemberToProject(ctx, req.ProjectID, req.UserID, leadID)
+	member, err := s.repo.SafeAddMemberToProject(ctx, projectID, req.UserID, leadID)
 	if err != nil {
 		if errors.Is(err, repository.ErrProjectMemberValidationFailed) {
 			return dto.ProjectMemberResponse{}, ErrProjectMemberValidationFailed

@@ -13,7 +13,7 @@ func registerProjectMembersRoutes(r *mux.Router, projectMemberHandler *handler.P
 		authMiddleware.Authenticate(http.HandlerFunc(projectMemberHandler.SafeAddMemberToProject)),
 	).Methods("POST")
 
-	r.Handle("/api/projects/{projects}/members",
+	r.Handle("/api/projects/{projectID}/members",
 		authMiddleware.Authenticate(http.HandlerFunc(projectMemberHandler.ListProjectMembers)),
 	).Methods("GET")
 }

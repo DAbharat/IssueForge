@@ -54,7 +54,7 @@ func main() {
 	authzService := service.NewAuthorizationService(authzRepo)
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWTSecret)
 
-	projectRepo := repository.NewProjectRepository(queries)
+	projectRepo := repository.NewProjectRepository(pool, queries)
 	projectService := service.NewProjectService(projectRepo, authzService)
 	projectHandler := handler.NewProjectHandler(projectService)
 

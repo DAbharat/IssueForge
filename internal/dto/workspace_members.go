@@ -3,9 +3,8 @@ package dto
 import "time"
 
 type AddWorkspaceMemberRequest struct {
-	WorkspaceID int64  `json:"workspace_id"`
-	UserID      int64  `json:"user_id"`
-	Role        string `json:"role"`
+	UserID int64  `json:"user_id"`
+	Role   string `json:"role"`
 }
 
 type WorkspaceMemberResponse struct {

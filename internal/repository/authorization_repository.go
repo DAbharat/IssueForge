@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -25,6 +26,7 @@ func (r *AuthorizationRepository) IsWorkspaceMember(ctx context.Context, workspa
 		WorkspaceID: workspaceID,
 		UserID:      userID,
 	}
+	log.Printf("checking membership: workspaceID=%d userID=%d", workspaceID, userID)
 
 	role, err := r.queries.IsWorkspaceMember(ctx, params)
 	if err != nil {
@@ -33,6 +35,7 @@ func (r *AuthorizationRepository) IsWorkspaceMember(ctx context.Context, workspa
 		}
 		return "", fmt.Errorf("check workspace member: %w", err)
 	}
+	log.Printf("role=%v err=%v", role, err)
 	return auth.UserRole(role), nil
 }
 
@@ -50,14 +53,19 @@ func (r *AuthorizationRepository) IsProjectLead(ctx context.Context, projectID, 
 }
 
 func (r *AuthorizationRepository) IsProjectMember(ctx context.Context, projectID, userID int64) (bool, error) {
+	log.Printf("IsProjectMember: projectID=%d userID=%d", projectID, userID)
+
 	params := sqlc.IsProjectMemberParams{
 		ProjectID: projectID,
 		UserID:    userID,
 	}
 
 	ok, err := r.queries.IsProjectMember(ctx, params)
+	log.Printf("IsProjectMember result: ok=%v err=%v", ok, err)
+
 	if err != nil {
 		return false, fmt.Errorf("check project member: %w", err)
 	}
+
 	return ok, nil
 }

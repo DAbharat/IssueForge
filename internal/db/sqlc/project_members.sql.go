@@ -107,9 +107,13 @@ WHERE EXISTS(
     WHERE p.id =  $1 AND p.lead_id = $3
 )
 AND EXISTS(
-    SELECT 1 FROM users u
-    JOIN projects p ON p.workspace_id = u.workspace_id
-    WHERE u.id = $2 AND p.id = $1
+    SELECT 1 FROM workspace_members wm
+    WHERE wm.user_id = $2
+    AND wm.workspace_id = (
+        SELECT workspace_id
+        FROM projects
+        WHERE id = $1
+    )
 )
 RETURNING project_id, user_id, joined_at
 `

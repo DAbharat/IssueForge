@@ -19,7 +19,7 @@ import (
 )
 
 type WorkspaceMemberService interface {
-	AddWorkspaceMember(ctx context.Context, adminID int64, req dto.AddWorkspaceMemberRequest) (dto.WorkspaceMemberResponse, error)
+	AddWorkspaceMember(ctx context.Context, adminID, workspaceID int64, req dto.AddWorkspaceMemberRequest) (dto.WorkspaceMemberResponse, error)
 	GetWorkspaceMember(ctx context.Context, workspaceID, requesterID, targetUserID int64) (dto.WorkspaceMemberSummary, error)
 	ListUserWorkspaces(ctx context.Context, userID int64, search string) ([]dto.WorkspaceSummary, error)
 	ListWorkspaceMembers(ctx context.Context, workspaceID, userID int64) ([]dto.WorkspaceMemberDetails, error)
@@ -58,7 +58,15 @@ func (h *WorkspaceMemberHandler) AddWorkspaceMember(w http.ResponseWriter, r *ht
 		return
 	}
 
-	member, err := h.workspaceMemberService.AddWorkspaceMember(r.Context(), adminID, req)
+	vars := mux.Vars(r)
+
+	workspaceID, err := strconv.ParseInt(vars["workspaceID"], 10, 64)
+	if err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	member, err := h.workspaceMemberService.AddWorkspaceMember(r.Context(), adminID, workspaceID, req)
 	if err != nil {
 		switch {
 		case errors.Is(err, auth.ErrForbidden):

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 )
 
@@ -50,6 +51,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, leadID int64, req dt
 		}
 		return dto.CreateProjectResponse{}, fmt.Errorf("create project service failure: %w", err)
 	}
+	log.Printf("service: workspaceID=%d leadID=%d", req.WorkspaceID, leadID)
 
 	return dto.CreateProjectResponse{
 		ID:          project.ID,

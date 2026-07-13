@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 )
 
 type AuthorizationRepo interface {
@@ -65,7 +66,11 @@ func (a *AuthorizationService) RequireProjectLead(ctx context.Context, projectID
 }
 
 func (a *AuthorizationService) RequireProjectMember(ctx context.Context, projectID, userID int64) error {
+	log.Printf("RequireProjectMember: projectID=%d userID=%d", projectID, userID)
+
 	ok, err := a.repo.IsProjectMember(ctx, projectID, userID)
+	log.Printf("RequireProjectMember: ok=%v err=%v", ok, err)
+
 	if err != nil {
 		return fmt.Errorf("check project member: %w", err)
 	}

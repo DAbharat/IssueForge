@@ -3,8 +3,7 @@ package dto
 import "time"
 
 type AddProjectMemberRequest struct {
-	ProjectID int64 `json:"project_id"`
-	UserID    int64 `json:"user_id"`
+	UserID int64 `json:"user_id"`
 }
 
 type ProjectMemberResponse struct {
