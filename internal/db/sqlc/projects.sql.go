@@ -7,48 +7,87 @@ package sqlc
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createProject = `-- name: CreateProject :one
 INSERT INTO projects(
-    owner_id,
+    workspace_id,
+    lead_id,
     name,
     description
 )
 VALUES(
-    $1, $2, $3
+    $1, $2, $3, $4
 )
-RETURNING id, owner_id, name, description, created_at, updated_at
+RETURNING id, workspace_id, lead_id, name, description, created_at
 `
 
 type CreateProjectParams struct {
-	OwnerID     int64  `json:"owner_id"`
+	WorkspaceID int64  `json:"workspace_id"`
+	LeadID      int64  `json:"lead_id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
-func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error) {
-	row := q.db.QueryRow(ctx, createProject, arg.OwnerID, arg.Name, arg.Description)
-	var i Project
+type CreateProjectRow struct {
+	ID          int64              `json:"id"`
+	WorkspaceID int64              `json:"workspace_id"`
+	LeadID      int64              `json:"lead_id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (CreateProjectRow, error) {
+	row := q.db.QueryRow(ctx, createProject,
+		arg.WorkspaceID,
+		arg.LeadID,
+		arg.Name,
+		arg.Description,
+	)
+	var i CreateProjectRow
 	err := row.Scan(
 		&i.ID,
-		&i.OwnerID,
+		&i.WorkspaceID,
+		&i.LeadID,
 		&i.Name,
 		&i.Description,
 		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return i, err
 }
 
-const listProjectsByOwner = `-- name: ListProjectsByOwner :many
-SELECT id, owner_id, name, description, created_at, updated_at FROM projects
-WHERE owner_id = $1
+const isProjectLead = `-- name: IsProjectLead :one
+SELECT EXISTS (
+    SELECT 1
+    FROM projects
+    WHERE id = $1 AND lead_id = $2
+)
+`
+
+type IsProjectLeadParams struct {
+	ID     int64 `json:"id"`
+	LeadID int64 `json:"lead_id"`
+}
+
+func (q *Queries) IsProjectLead(ctx context.Context, arg IsProjectLeadParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isProjectLead, arg.ID, arg.LeadID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const listProjectsByLead = `-- name: ListProjectsByLead :many
+SELECT id, workspace_id, lead_id, name, description, created_at, updated_at
+FROM projects
+WHERE lead_id = $1
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListProjectsByOwner(ctx context.Context, ownerID int64) ([]Project, error) {
-	rows, err := q.db.Query(ctx, listProjectsByOwner, ownerID)
+func (q *Queries) ListProjectsByLead(ctx context.Context, leadID int64) ([]Project, error) {
+	rows, err := q.db.Query(ctx, listProjectsByLead, leadID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +97,43 @@ func (q *Queries) ListProjectsByOwner(ctx context.Context, ownerID int64) ([]Pro
 		var i Project
 		if err := rows.Scan(
 			&i.ID,
-			&i.OwnerID,
+			&i.WorkspaceID,
+			&i.LeadID,
+			&i.Name,
+			&i.Description,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProjectsByWorkspace = `-- name: ListProjectsByWorkspace :many
+SELECT id, workspace_id, lead_id, name, description, created_at, updated_at
+FROM projects
+WHERE workspace_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListProjectsByWorkspace(ctx context.Context, workspaceID int64) ([]Project, error) {
+	rows, err := q.db.Query(ctx, listProjectsByWorkspace, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Project
+	for rows.Next() {
+		var i Project
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.LeadID,
 			&i.Name,
 			&i.Description,
 			&i.CreatedAt,

@@ -1,15 +1,33 @@
 -- name: CreateProject :one
 INSERT INTO projects(
-    owner_id,
+    workspace_id,
+    lead_id,
     name,
     description
 )
 VALUES(
-    $1, $2, $3
+    $1, $2, $3, $4
 )
-RETURNING *;
+RETURNING id, workspace_id, lead_id, name, description, created_at;
 
--- name: ListProjectsByOwner :many
-SELECT * FROM projects
-WHERE owner_id = $1
+
+-- name: ListProjectsByWorkspace :many
+SELECT id, workspace_id, lead_id, name, description, created_at, updated_at
+FROM projects
+WHERE workspace_id = $1
 ORDER BY created_at DESC;
+
+
+-- name: ListProjectsByLead :many
+SELECT id, workspace_id, lead_id, name, description, created_at, updated_at
+FROM projects
+WHERE lead_id = $1
+ORDER BY created_at DESC;
+
+
+-- name: IsProjectLead :one
+SELECT EXISTS (
+    SELECT 1
+    FROM projects
+    WHERE id = $1 AND lead_id = $2
+);

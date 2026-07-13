@@ -3,30 +3,36 @@ package service
 import (
 	"IssueForge/internal/db/sqlc"
 	"IssueForge/internal/dto"
-	"IssueForge/internal/repository"
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 )
 
-var (
-	ErrInvalidProjectName = errors.New("project name must be between 3 and 100 characters")
-	ErrInvalidDescription = errors.New("project description must be between 10 and 300 characters")
-	ErrProjectNameTaken   = errors.New("a project with this name already exists for your account")
-)
-
-type ProjectService struct {
-	projectRepo *repository.ProjectRepository
+type ProjectRepo interface {
+	CreateProject(ctx context.Context, workspaceID, leadID int64, name, description string) (sqlc.CreateProjectRow, error)
+	ListProjectsByLead(ctx context.Context, leadID int64) ([]sqlc.Project, error)
+	ListProjectsByWorkspace(ctx context.Context, workspaceID int64) ([]sqlc.Project, error)
 }
 
-func NewProjectService(repo *repository.ProjectRepository) *ProjectService {
+type ProjectService struct {
+	projectRepo ProjectRepo
+	authz       AuthzService
+}
+
+func NewProjectService(repo ProjectRepo, authz AuthzService) *ProjectService {
 	return &ProjectService{
 		projectRepo: repo,
+		authz:       authz,
 	}
 }
 
-func (s *ProjectService) CreateProject(ctx context.Context, ownerID int64, req dto.CreateProjectRequest) (dto.CreateProjectResponse, error) {
+func (s *ProjectService) CreateProject(ctx context.Context, leadID int64, req dto.CreateProjectRequest) (dto.CreateProjectResponse, error) {
+	if err := s.authz.RequireWorkspaceMember(ctx, req.WorkspaceID, leadID); err != nil {
+		return dto.CreateProjectResponse{}, err
+	}
+
 	projectName := strings.TrimSpace(req.Name)
 	projectDesc := strings.TrimSpace(req.Description)
 
@@ -38,32 +44,28 @@ func (s *ProjectService) CreateProject(ctx context.Context, ownerID int64, req d
 		return dto.CreateProjectResponse{}, ErrInvalidDescription
 	}
 
-	params := sqlc.CreateProjectParams{
-		OwnerID:     ownerID,
-		Name:        projectName,
-		Description: projectDesc,
-	}
-
-	project, err := s.projectRepo.CreateProject(ctx, params)
+	project, err := s.projectRepo.CreateProject(ctx, req.WorkspaceID, leadID, projectName, projectDesc)
 	if err != nil {
-		if errors.Is(err, repository.ErrDuplicateProjectName) {
-			return dto.CreateProjectResponse{}, ErrProjectNameTaken
+		if errors.Is(err, ErrProjectNameTaken) {
+			return dto.CreateProjectResponse{}, err
 		}
 		return dto.CreateProjectResponse{}, fmt.Errorf("create project service failure: %w", err)
 	}
+	log.Printf("service: workspaceID=%d leadID=%d", req.WorkspaceID, leadID)
 
 	return dto.CreateProjectResponse{
 		ID:          project.ID,
-		OwnerID:     project.OwnerID,
+		WorkspaceID: project.WorkspaceID,
+		LeadID:      project.LeadID,
 		Name:        project.Name,
 		Description: project.Description,
 	}, nil
 }
 
-func (s *ProjectService) ListProjects(ctx context.Context, ownerID int64) ([]dto.ProjectResponse, error) {
-	dbProjects, err := s.projectRepo.ListProjectsByOwner(ctx, ownerID)
+func (s *ProjectService) ListProjectsByLead(ctx context.Context, leadID int64) ([]dto.ProjectResponse, error) {
+	dbProjects, err := s.projectRepo.ListProjectsByLead(ctx, leadID)
 	if err != nil {
-		return nil, fmt.Errorf("list projects service failure: %w", err)
+		return nil, fmt.Errorf("list projects by lead service failure: %w", err)
 	}
 
 	projects := make([]dto.ProjectResponse, 0, len(dbProjects))
@@ -71,7 +73,32 @@ func (s *ProjectService) ListProjects(ctx context.Context, ownerID int64) ([]dto
 	for _, p := range dbProjects {
 		projects = append(projects, dto.ProjectResponse{
 			ID:          p.ID,
-			OwnerID:     p.OwnerID,
+			WorkspaceID: p.WorkspaceID,
+			LeadID:      p.LeadID,
+			Name:        p.Name,
+			Description: p.Description,
+		})
+	}
+	return projects, nil
+}
+
+func (s *ProjectService) ListProjectsByWorkspace(ctx context.Context, workspaceID, userID int64) ([]dto.ProjectResponse, error) {
+	if err := s.authz.RequireWorkspaceMember(ctx, workspaceID, userID); err != nil {
+		return nil, err
+	}
+
+	workspaceProjects, err := s.projectRepo.ListProjectsByWorkspace(ctx, workspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("list projects by workspaces: %w", err)
+	}
+
+	projects := make([]dto.ProjectResponse, 0, len(workspaceProjects))
+
+	for _, p := range workspaceProjects {
+		projects = append(projects, dto.ProjectResponse{
+			ID:          p.ID,
+			WorkspaceID: p.WorkspaceID,
+			LeadID:      p.LeadID,
 			Name:        p.Name,
 			Description: p.Description,
 		})

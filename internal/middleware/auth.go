@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"IssueForge/internal/auth"
+	"IssueForge/internal/httpx"
 	"context"
 	"errors"
 	"net/http"
@@ -27,24 +28,25 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			http.Error(w, "missing authorization header", http.StatusUnauthorized)
+			httpx.RespondWithError(w, http.StatusUnauthorized, "missing authorization header")
 			return
 		}
 
-		if !strings.HasPrefix(authHeader, "Bearer ") {
-			http.Error(w, "invalid authorization header", http.StatusUnauthorized)
+		parts := strings.Fields(authHeader)
+		if len(parts) < 2 || parts[0] != "Bearer" {
+			httpx.RespondWithError(w, http.StatusUnauthorized, "invalid authorization header")
 			return
 		}
 
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		tokenString := parts[1]
 
 		claims, err := auth.ParseToken(tokenString, m.jwtSecret)
 		if err != nil {
 			switch {
 			case errors.Is(err, auth.ErrExpiredToken):
-				http.Error(w, "token expired", http.StatusUnauthorized)
+				httpx.RespondWithError(w, http.StatusUnauthorized, "token expired")
 			default:
-				http.Error(w, "invalid token", http.StatusUnauthorized)
+				httpx.RespondWithError(w, http.StatusUnauthorized, "invalid token")
 			}
 			return
 		}

@@ -44,15 +44,32 @@ func main() {
 	}
 
 	queries := sqlc.New(pool)
+
 	userRepo := repository.NewUserRepository(queries)
-	userService := service.NewUserService(userRepo, cfg.JWTSecret)
+	workspaceMemberRepo := repository.NewWorkspaceMemberRepository(queries)
+	userService := service.NewUserService(userRepo, workspaceMemberRepo, cfg.JWTSecret)
 	userHandler := handler.NewUserHandler(userService)
+
+	authzRepo := repository.NewAuthorizationRepository(queries)
+	authzService := service.NewAuthorizationService(authzRepo)
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWTSecret)
-	projectRepo := repository.NewProjectRepository(queries)
-	projectService := service.NewProjectService(projectRepo)
+
+	projectRepo := repository.NewProjectRepository(pool, queries)
+	projectService := service.NewProjectService(projectRepo, authzService)
 	projectHandler := handler.NewProjectHandler(projectService)
 
-	r := router.New(userHandler, projectHandler, authMiddleware)
+	projectMemberRepo := repository.NewProjectMemberRepository(queries)
+	projectMemberService := service.NewProjectMemberService(projectMemberRepo, authzService)
+	projectMemberHandler := handler.NewProjectMemberHandler(projectMemberService)
+
+	workspaceMemberService := service.NewWorkspaceMemberService(workspaceMemberRepo, authzService)
+	workspaceMemberHandler := handler.NewWorkspaceMemberHandler(workspaceMemberService)
+
+	workspaceRepo := repository.NewWorkspaceRepository(queries)
+	workspaceService := service.NewWorkspaceService(workspaceRepo, workspaceMemberRepo, authzService)
+	workspaceHandler := handler.NewWorkspaceHandler(workspaceService)
+
+	r := router.New(userHandler, projectHandler, projectMemberHandler, workspaceHandler, workspaceMemberHandler, authMiddleware)
 
 	server := &http.Server{
 		Addr:              serverAddr,
