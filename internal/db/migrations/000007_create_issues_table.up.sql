@@ -8,8 +8,8 @@ CREATE TABLE
         project_id BIGINT NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
         created_by BIGINT NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
         assigned_to BIGINT REFERENCES users (id) ON DELETE SET NULL,
-        title VARCHAR(50) NOT NULL,
-        description TEXT,
+        title VARCHAR(100) NOT NULL,
+        description TEXT NOT NULL,
         status issue_status NOT NULL DEFAULT 'TODO',
         priority issue_priority NOT NULL DEFAULT 'MEDIUM',
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW (),
@@ -23,3 +23,4 @@ CREATE TRIGGER update_issues_modtime
     BEFORE UPDATE ON issues
     FOR EACH ROW
     EXECUTE PROCEDURE update_updated_at_column();
+    

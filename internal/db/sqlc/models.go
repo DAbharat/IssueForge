@@ -145,7 +145,7 @@ type Issue struct {
 	CreatedBy   int64              `json:"created_by"`
 	AssignedTo  pgtype.Int8        `json:"assigned_to"`
 	Title       string             `json:"title"`
-	Description pgtype.Text        `json:"description"`
+	Description string             `json:"description"`
 	Status      IssueStatus        `json:"status"`
 	Priority    IssuePriority      `json:"priority"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`

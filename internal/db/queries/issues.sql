@@ -69,6 +69,7 @@ WHERE i.created_by = $1
 ORDER BY i.created_at DESC;
 
 
--- name: DeleteIssue :exec
+-- name: DeleteIssue :one
 DELETE FROM issues
-WHERE id = $1;
+WHERE id = $1
+RETURNING id;

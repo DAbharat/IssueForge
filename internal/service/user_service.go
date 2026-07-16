@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"log"
 	"net/mail"
+	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -41,12 +43,39 @@ func NewUserService(userRepo UserRepo, workspaceMemberRepo WorkspaceMemberRepo, 
 	}
 }
 
+func validatePasswordComplexity(password string) bool {
+	var (
+		hasUpper   bool
+		hasLower   bool
+		hasNumber  bool
+		hasSpecial bool
+	)
+
+	for _, r := range password {
+		switch {
+		case unicode.IsUpper(r):
+			hasUpper = true
+		case unicode.IsLower(r):
+			hasLower = true
+		case unicode.IsNumber(r):
+			hasNumber = true
+		case unicode.IsPunct(r) || unicode.IsSymbol(r):
+			hasSpecial = true
+		}
+	}
+
+	return hasUpper && hasLower && hasNumber && hasSpecial
+}
+
 func (s *UserService) validateCreateUser(req dto.CreateUserRequest) error {
 
-	if len(req.Password) < 8 {
+	if len(req.Password) < 8 || len(req.Password) > 72 {
 		return ErrInvalidPassword
 	}
-	if len(req.Fullname) < 3 {
+	if !validatePasswordComplexity(req.Password) {
+		return ErrInvalidPassword
+	}
+	if utf8.RuneCountInString(req.Fullname) < 3 {
 		return ErrInvalidFullName
 	}
 	if _, err := mail.ParseAddress(req.Email); err != nil {

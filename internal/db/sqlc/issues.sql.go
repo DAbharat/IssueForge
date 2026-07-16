@@ -31,7 +31,7 @@ type CreateIssueParams struct {
 	CreatedBy   int64         `json:"created_by"`
 	AssignedTo  pgtype.Int8   `json:"assigned_to"`
 	Title       string        `json:"title"`
-	Description pgtype.Text   `json:"description"`
+	Description string        `json:"description"`
 	Status      IssueStatus   `json:"status"`
 	Priority    IssuePriority `json:"priority"`
 }
@@ -62,14 +62,17 @@ func (q *Queries) CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue
 	return i, err
 }
 
-const deleteIssue = `-- name: DeleteIssue :exec
+const deleteIssue = `-- name: DeleteIssue :one
 DELETE FROM issues
 WHERE id = $1
+RETURNING id
 `
 
-func (q *Queries) DeleteIssue(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, deleteIssue, id)
-	return err
+func (q *Queries) DeleteIssue(ctx context.Context, id int64) (int64, error) {
+	row := q.db.QueryRow(ctx, deleteIssue, id)
+	var id_2 int64
+	err := row.Scan(&id_2)
+	return id_2, err
 }
 
 const getIssueByID = `-- name: GetIssueByID :one
@@ -86,7 +89,7 @@ type GetIssueByIDRow struct {
 	CreatedBy    int64              `json:"created_by"`
 	AssignedTo   pgtype.Int8        `json:"assigned_to"`
 	Title        string             `json:"title"`
-	Description  pgtype.Text        `json:"description"`
+	Description  string             `json:"description"`
 	Status       IssueStatus        `json:"status"`
 	Priority     IssuePriority      `json:"priority"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
@@ -302,7 +305,7 @@ RETURNING id, project_id, created_by, assigned_to, title, description, status, p
 type UpdateIssueDetailsParams struct {
 	ID          int64         `json:"id"`
 	Title       string        `json:"title"`
-	Description pgtype.Text   `json:"description"`
+	Description string        `json:"description"`
 	Priority    IssuePriority `json:"priority"`
 }
 

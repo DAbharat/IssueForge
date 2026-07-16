@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"unicode/utf8"
 )
 
 type WorkspaceRepo interface {
@@ -37,7 +38,7 @@ func NewWorkspaceService(repo WorkspaceRepo, workspaceMemRepo WorkspaceMemRepo, 
 
 func (s *WorkspaceService) CreateWorkspace(ctx context.Context, creatorID int64, req dto.CreateWorkspaceRequest) (dto.CreateWorkspaceResponse, error) {
 	workspaceName := strings.TrimSpace(req.Name)
-	if len(workspaceName) < 3 || len(workspaceName) > 30 {
+	if utf8.RuneCountInString(workspaceName) < 3 || utf8.RuneCountInString(workspaceName) > 30 {
 		return dto.CreateWorkspaceResponse{}, ErrInvalidWorkspaceName
 	}
 

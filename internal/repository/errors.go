@@ -14,4 +14,6 @@ var (
 	ErrProjectNotFound               = errors.New("project does not exist")
 	ErrProjectMemberValidationFailed = errors.New("cannot add the user in this project")
 	ErrDuplicateProjectName          = errors.New("a project with this name already exists for this user")
+	ErrIssueNotFound                 = errors.New("issue not found")
+	ErrIssueAlreadyExists            = errors.New("issue already exists")
 )

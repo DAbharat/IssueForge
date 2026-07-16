@@ -3,12 +3,12 @@ package service
 import "errors"
 
 var (
-	ErrInvalidPassword               = errors.New("password must be atleast 8 characters")
+	ErrInvalidPassword               = errors.New("password must be atleast 8 and atmost 72 characters, containing uppercase, lowercase, numeric and special character")
 	ErrInvalidFullName               = errors.New("name must be more than 3 characters")
 	ErrInvalidEmail                  = errors.New("email is invalid")
 	ErrInvalidCredentials            = errors.New("invalid credentials")
 	ErrInvalidProjectName            = errors.New("project name must be between 3 and 100 characters")
-	ErrInvalidDescription            = errors.New("project description must be between 10 and 300 characters")
+	ErrInvalidDescription            = errors.New("description must be between 10 and 300 characters")
 	ErrProjectNameTaken              = errors.New("a project with this name already exists for your account")
 	ErrWorkspaceNameTaken            = errors.New("this workspace name has already been taken")
 	ErrInvalidWorkspaceName          = errors.New("workspace name must be more than 3 and less than 30 characters")
@@ -22,4 +22,12 @@ var (
 	ErrInvalidRole                   = errors.New("invalid role")
 	ErrInvalidWorkspaceID            = errors.New("invalid workspace id")
 	ErrInvalidUserID                 = errors.New("invalid user id")
+	ErrInvalidProjectID              = errors.New("invalid project id")
+	ErrInvalidIssueID                = errors.New("invalid issue id")
+	ErrIssueNotFound                 = errors.New("issue not found")
+	ErrInvalidTitle                  = errors.New("invalid title")
+	ErrInvalidStatus                 = errors.New("invalid status")
+	ErrInvalidPriority               = errors.New("invalid priority")
+	ErrInvalidAssignee               = errors.New("invalid assignee")
+	ErrForbidden                     = errors.New("forbidden")
 )

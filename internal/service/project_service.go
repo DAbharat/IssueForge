@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"unicode/utf8"
 )
 
 type ProjectRepo interface {
@@ -36,11 +37,11 @@ func (s *ProjectService) CreateProject(ctx context.Context, leadID int64, req dt
 	projectName := strings.TrimSpace(req.Name)
 	projectDesc := strings.TrimSpace(req.Description)
 
-	if len(projectName) < 3 || len(projectName) > 100 {
+	if utf8.RuneCountInString(projectName) < 3 || utf8.RuneCountInString(projectName) > 100 {
 		return dto.CreateProjectResponse{}, ErrInvalidProjectName
 	}
 
-	if len(projectDesc) < 10 || len(projectDesc) > 300 {
+	if utf8.RuneCountInString(projectDesc) < 10 || utf8.RuneCountInString(projectDesc) > 300 {
 		return dto.CreateProjectResponse{}, ErrInvalidDescription
 	}
 

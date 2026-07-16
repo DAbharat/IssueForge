@@ -17,7 +17,7 @@ type Querier interface {
 	CreateOnboardingUser(ctx context.Context, arg CreateOnboardingUserParams) (CreateOnboardingUserRow, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (CreateProjectRow, error)
 	CreateWorkspace(ctx context.Context, name string) (Workspace, error)
-	DeleteIssue(ctx context.Context, id int64) error
+	DeleteIssue(ctx context.Context, id int64) (int64, error)
 	GetIssueByID(ctx context.Context, id int64) (GetIssueByIDRow, error)
 	GetUserByID(ctx context.Context, id int64) (GetUserByIDRow, error)
 	GetUserForLogin(ctx context.Context, email string) (GetUserForLoginRow, error)

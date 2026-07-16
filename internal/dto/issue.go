@@ -7,6 +7,7 @@ type CreateIssueRequest struct {
 	AssignedTo  *int64 `json:"assigned_to,omitempty"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
+	Status      string `json:"status"`
 	Priority    string `json:"priority"`
 }
 
