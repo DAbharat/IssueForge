@@ -349,7 +349,7 @@ func (s *IssueService) UpdateIssueAssignee(ctx context.Context, requesterID, iss
 	}, nil
 }
 
-func (s *IssueService) ListAssignedIssues(ctx context.Context, requesterID, assignedTo int64) ([]dto.IssueSummary, error) {
+func (s *IssueService) ListAssignedIssues(ctx context.Context, requesterID, assignedTo int64) ([]dto.UserIssueSummary, error) {
 	if assignedTo <= 0 {
 		return nil, ErrInvalidAssignee
 	}
@@ -363,22 +363,23 @@ func (s *IssueService) ListAssignedIssues(ctx context.Context, requesterID, assi
 		return nil, fmt.Errorf("list assigned issues: %w", err)
 	}
 
-	issues := make([]dto.IssueSummary, 0, len(dbIssues))
+	issues := make([]dto.UserIssueSummary, 0, len(dbIssues))
 
 	for _, i := range dbIssues {
-		issues = append(issues, dto.IssueSummary{
-			ID:        i.ID,
-			ProjectID: i.ProjectID,
-			Title:     i.Title,
-			Status:    string(i.Status),
-			Priority:  string(i.Priority),
-			CreatedAt: i.CreatedAt.Time,
+		issues = append(issues, dto.UserIssueSummary{
+			ID:          i.ID,
+			ProjectID:   i.ProjectID,
+			ProjectName: i.ProjectName,
+			Title:       i.Title,
+			Status:      string(i.Status),
+			Priority:    string(i.Priority),
+			CreatedAt:   i.CreatedAt.Time,
 		})
 	}
 	return issues, nil
 }
 
-func (s *IssueService) ListCreatedIssues(ctx context.Context, requesterID, createdBy int64) ([]dto.IssueSummary, error) {
+func (s *IssueService) ListCreatedIssues(ctx context.Context, requesterID, createdBy int64) ([]dto.UserIssueSummary, error) {
 	if createdBy <= 0 {
 		return nil, ErrInvalidUserID
 	}
@@ -392,15 +393,16 @@ func (s *IssueService) ListCreatedIssues(ctx context.Context, requesterID, creat
 		return nil, fmt.Errorf("list created issues: %w", err)
 	}
 
-	issues := make([]dto.IssueSummary, 0, len(dbIssues))
+	issues := make([]dto.UserIssueSummary, 0, len(dbIssues))
 	for _, i := range dbIssues {
-		issues = append(issues, dto.IssueSummary{
-			ID:        i.ID,
-			ProjectID: i.ProjectID,
-			Title:     i.Title,
-			Status:    string(i.Status),
-			Priority:  string(i.Priority),
-			CreatedAt: i.CreatedAt.Time,
+		issues = append(issues, dto.UserIssueSummary{
+			ID:          i.ID,
+			ProjectID:   i.ProjectID,
+			ProjectName: i.ProjectName,
+			Title:       i.Title,
+			Status:      string(i.Status),
+			Priority:    string(i.Priority),
+			CreatedAt:   i.CreatedAt.Time,
 		})
 	}
 	return issues, nil
