@@ -53,9 +53,8 @@ type IssueSummary struct {
 }
 
 type UpdateIssueDetailsRequest struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Priority    string `json:"priority"`
+	Title       string  `json:"title"`
+	Description *string `json:"description,omitempty"`
 }
 
 type UpdateIssueStatusRequest struct {
@@ -64,6 +63,10 @@ type UpdateIssueStatusRequest struct {
 
 type UpdateIssueAssigneeRequest struct {
 	AssignedTo *int64 `json:"assigned_to"`
+}
+
+type UpdateIssuePriority struct {
+	Priority string `json:"priority"`
 }
 
 type UserIssueSummary struct {

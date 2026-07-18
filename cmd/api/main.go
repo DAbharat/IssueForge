@@ -69,7 +69,11 @@ func main() {
 	workspaceService := service.NewWorkspaceService(workspaceRepo, workspaceMemberRepo, authzService)
 	workspaceHandler := handler.NewWorkspaceHandler(workspaceService)
 
-	r := router.New(userHandler, projectHandler, projectMemberHandler, workspaceHandler, workspaceMemberHandler, authMiddleware)
+	issueRepo := repository.NewIssueRepository(queries)
+	issueService := service.NewIssueService(issueRepo, authzService)
+	issueHandler := handler.NewIssueHandler(issueService)
+
+	r := router.New(userHandler, projectHandler, projectMemberHandler, workspaceHandler, workspaceMemberHandler, issueHandler, authMiddleware)
 
 	server := &http.Server{
 		Addr:              serverAddr,

@@ -24,6 +24,7 @@ type IssueService interface {
 	UpdateIssueDetails(ctx context.Context, requesterID, issueID int64, req dto.UpdateIssueDetailsRequest) (dto.IssueResponse, error)
 	UpdateIssueStatus(ctx context.Context, requesterID, issueID int64, req dto.UpdateIssueStatusRequest) (dto.IssueResponse, error)
 	UpdateIssueAssignee(ctx context.Context, requesterID, issueID int64, req dto.UpdateIssueAssigneeRequest) (dto.IssueResponse, error)
+	UpdateIssuePriority(ctx context.Context, requesterID, issueID int64, req dto.UpdateIssuePriority) (dto.IssueResponse, error)
 	ListAssignedIssues(ctx context.Context, requesterID, assignedTo int64) ([]dto.UserIssueSummary, error)
 	ListCreatedIssues(ctx context.Context, requesterID, createdBy int64) ([]dto.UserIssueSummary, error)
 	DeleteIssue(ctx context.Context, requesterID, issueID int64) (int64, error)
@@ -60,6 +61,16 @@ func (h *IssueHandler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 		httpx.RespondWithError(w, http.StatusBadRequest, "request body must contain a single json object")
 		return
 	}
+
+	vars := mux.Vars(r)
+
+	projectID, err := strconv.ParseInt(vars["projectID"], 10, 64)
+	if err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidPassword.Error())
+		return
+	}
+
+	req.ProjectID = projectID
 
 	issue, err := h.issueService.CreateIssue(r.Context(), creatorID, req)
 	if err != nil {
@@ -191,8 +202,7 @@ func (h *IssueHandler) UpdateIssueDetails(w http.ResponseWriter, r *http.Request
 		case errors.Is(err, service.ErrIssueNotFound):
 			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
 		case errors.Is(err, service.ErrInvalidTitle),
-			errors.Is(err, service.ErrInvalidDescription),
-			errors.Is(err, service.ErrInvalidPriority):
+			errors.Is(err, service.ErrInvalidDescription):
 			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
 		default:
 			log.Printf("update issue details fail: %v", err)
@@ -204,6 +214,7 @@ func (h *IssueHandler) UpdateIssueDetails(w http.ResponseWriter, r *http.Request
 }
 
 func (h *IssueHandler) UpdateIssueStatus(w http.ResponseWriter, r *http.Request) {
+	log.Println("===== UpdateIssueStatus handler called =====")
 	requesterID, ok := middleware.GetUserFromContext(r.Context())
 	if !ok {
 		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
@@ -211,12 +222,14 @@ func (h *IssueHandler) UpdateIssueStatus(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req dto.UpdateIssueStatusRequest
+	log.Printf("req body: %v", r.Body)
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
 
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&req); err != nil {
+		log.Printf("decode error: %T: %v", err, err)
 		httpx.RespondWithError(w, http.StatusBadRequest, "invalid or oversized request body")
 		return
 	}
@@ -297,6 +310,55 @@ func (h *IssueHandler) UpdateIssueAssignee(w http.ResponseWriter, r *http.Reques
 		default:
 			log.Printf("update issue assignee fail: %v", err)
 			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+	httpx.RespondWithJSON(w, http.StatusOK, issue)
+}
+
+func (h *IssueHandler) UpdateIssuePriority(w http.ResponseWriter, r *http.Request) {
+	requesterID, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusForbidden, "unauthorized")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+
+	var req dto.UpdateIssuePriority
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, "invalid or oversized request body")
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		httpx.RespondWithError(w, http.StatusBadRequest, "request body must contain a single json object")
+		return
+	}
+
+	vars := mux.Vars(r)
+
+	issueID, err := strconv.ParseInt(vars["issueID"], 10, 64)
+	if err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidIssueID.Error())
+		return
+	}
+
+	issue, err := h.issueService.UpdateIssuePriority(r.Context(), requesterID, issueID, req)
+	if err != nil {
+		switch {
+		case errors.Is(err, auth.ErrForbidden):
+			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
+		case errors.Is(err, service.ErrIssueNotFound):
+			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
+		case errors.Is(err, service.ErrInvalidIssueID),
+			errors.Is(err, service.ErrInvalidPriority):
+			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
+		default:
+			log.Printf("update issue priority fail: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}

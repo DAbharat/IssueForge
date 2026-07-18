@@ -43,6 +43,9 @@ func (r *IssueRepository) CreateIssue(ctx context.Context, projectID, createdBy 
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
+			fmt.Println("PG Code:", pgErr.Code)
+			fmt.Println("Constraint:", pgErr.ConstraintName)
+			fmt.Println("Message:", pgErr.Message)
 			switch pgErr.Code {
 			case "23503":
 				switch pgErr.ConstraintName {
@@ -80,12 +83,11 @@ func (r *IssueRepository) ListProjectIssues(ctx context.Context, projectID int64
 	return issues, nil
 }
 
-func (r *IssueRepository) UpdateIssueDetails(ctx context.Context, id int64, title, description, priority string) (sqlc.Issue, error) {
+func (r *IssueRepository) UpdateIssueDetails(ctx context.Context, id int64, title, description string) (sqlc.Issue, error) {
 	params := sqlc.UpdateIssueDetailsParams{
 		ID:          id,
 		Title:       title,
 		Description: description,
-		Priority:    sqlc.IssuePriority(priority),
 	}
 
 	issue, err := r.queries.UpdateIssueDetails(ctx, params)
@@ -143,6 +145,22 @@ func (r *IssueRepository) UpdateIssueAssignee(ctx context.Context, id int64, ass
 			return sqlc.Issue{}, ErrIssueNotFound
 		}
 		return sqlc.Issue{}, fmt.Errorf("update issue assignee: %w", err)
+	}
+	return issue, nil
+}
+
+func (r *IssueRepository) UpdateIssuePriority(ctx context.Context, id int64, priority string) (sqlc.Issue, error) {
+	params := sqlc.UpdateIssuePriorityParams{
+		ID:       id,
+		Priority: sqlc.IssuePriority(priority),
+	}
+
+	issue, err := r.queries.UpdateIssuePriority(ctx, params)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.Issue{}, ErrIssueNotFound
+		}
+		return sqlc.Issue{}, fmt.Errorf("update issue priority: %w", err)
 	}
 	return issue, nil
 }

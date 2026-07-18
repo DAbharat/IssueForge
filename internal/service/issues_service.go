@@ -15,9 +15,10 @@ type IssueRepo interface {
 	CreateIssue(ctx context.Context, creatorID, projectID int64, assignedTo *int64, title, description, status, priority string) (sqlc.Issue, error)
 	GetIssueByID(ctx context.Context, issueID int64) (sqlc.GetIssueByIDRow, error)
 	ListProjectIssues(ctx context.Context, projectID int64) ([]sqlc.ListProjectIssuesRow, error)
-	UpdateIssueDetails(ctx context.Context, issueID int64, title, description, priority string) (sqlc.Issue, error)
-	UpdateIssueStatus(ctx context.Context, issueID, projectID int64, status string) (sqlc.Issue, error)
+	UpdateIssueDetails(ctx context.Context, issueID int64, title, description string) (sqlc.Issue, error)
+	UpdateIssueStatus(ctx context.Context, issueID int64, status string) (sqlc.Issue, error)
 	UpdateIssueAssignee(ctx context.Context, issueID int64, assignedTo *int64) (sqlc.Issue, error)
+	UpdateIssuePriority(ctx context.Context, issueID int64, priority string) (sqlc.Issue, error)
 	ListAssignedIssues(ctx context.Context, assignedTo int64) ([]sqlc.ListAssignedIssuesRow, error)
 	ListCreatedIssues(ctx context.Context, createdBy int64) ([]sqlc.ListCreatedIssuesRow, error)
 	DeleteIssue(ctx context.Context, issueID int64) (int64, error)
@@ -76,7 +77,7 @@ func (s *IssueService) CreateIssue(ctx context.Context, creatorID int64, req dto
 		}
 	}
 
-	issue, err := s.repo.CreateIssue(ctx, creatorID, req.ProjectID, req.AssignedTo, issueTitle, issueDescription, req.Status, req.Priority)
+	issue, err := s.repo.CreateIssue(ctx, req.ProjectID, creatorID, req.AssignedTo, issueTitle, issueDescription, req.Status, req.Priority)
 	if err != nil {
 		return dto.CreateIssueResponse{}, fmt.Errorf("create issue: %w", err)
 	}
@@ -89,8 +90,8 @@ func (s *IssueService) CreateIssue(ctx context.Context, creatorID int64, req dto
 	return dto.CreateIssueResponse{
 		ID:          issue.ID,
 		ProjectID:   issue.ProjectID,
-		AssignedTo:  assignedTo,
 		CreatedBy:   creatorID,
+		AssignedTo:  assignedTo,
 		Title:       issueTitle,
 		Description: issueDescription,
 		Status:      string(issue.Status),
@@ -193,25 +194,25 @@ func (s *IssueService) UpdateIssueDetails(ctx context.Context, requesterID, issu
 		return dto.IssueResponse{}, ErrInvalidIssueID
 	}
 
-	issueTitle := strings.TrimSpace(req.Title)
-	issueDescription := strings.TrimSpace(req.Description)
-
-	if utf8.RuneCountInString(issueTitle) < 8 || utf8.RuneCountInString(issueTitle) > 50 {
-		return dto.IssueResponse{}, ErrInvalidTitle
-	}
-	if utf8.RuneCountInString(issueDescription) < 10 || utf8.RuneCountInString(issueDescription) > 300 {
-		return dto.IssueResponse{}, ErrInvalidDescription
-	}
-
-	switch req.Priority {
-	case "LOW", "MEDIUM", "HIGH":
-	default:
-		return dto.IssueResponse{}, ErrInvalidPriority
-	}
-
 	dbIssue, err := s.repo.GetIssueByID(ctx, issueID)
 	if err != nil {
 		return dto.IssueResponse{}, err
+	}
+
+	description := dbIssue.Description
+
+	issueTitle := strings.TrimSpace(req.Title)
+
+	if req.Description != nil {
+		description := strings.TrimSpace(*req.Description)
+
+		if utf8.RuneCountInString(description) < 10 || utf8.RuneCountInString(description) > 300 {
+			return dto.IssueResponse{}, ErrInvalidDescription
+		}
+	}
+
+	if utf8.RuneCountInString(issueTitle) < 8 || utf8.RuneCountInString(issueTitle) > 50 {
+		return dto.IssueResponse{}, ErrInvalidTitle
 	}
 
 	isProjectLead := s.authz.RequireProjectLead(ctx, dbIssue.ProjectID, requesterID) == nil
@@ -221,7 +222,7 @@ func (s *IssueService) UpdateIssueDetails(ctx context.Context, requesterID, issu
 		return dto.IssueResponse{}, ErrForbidden
 	}
 
-	issues, err := s.repo.UpdateIssueDetails(ctx, issueID, issueTitle, issueDescription, req.Priority)
+	issues, err := s.repo.UpdateIssueDetails(ctx, issueID, issueTitle, description)
 	if err != nil {
 		if errors.Is(err, repository.ErrIssueNotFound) {
 			return dto.IssueResponse{}, ErrIssueNotFound
@@ -267,7 +268,7 @@ func (s *IssueService) UpdateIssueStatus(ctx context.Context, requesterID, issue
 		return dto.IssueResponse{}, err
 	}
 
-	issue, err := s.repo.UpdateIssueStatus(ctx, issueID, dbIssue.ProjectID, req.Status)
+	issue, err := s.repo.UpdateIssueStatus(ctx, issueID, req.Status)
 	if err != nil {
 		if errors.Is(err, repository.ErrIssueNotFound) {
 			return dto.IssueResponse{}, ErrIssueNotFound
@@ -335,6 +336,56 @@ func (s *IssueService) UpdateIssueAssignee(ctx context.Context, requesterID, iss
 	if issue.AssignedTo.Valid {
 		assignedTo = &issue.AssignedTo.Int64
 	}
+	return dto.IssueResponse{
+		ID:          issue.ID,
+		ProjectID:   issue.ProjectID,
+		CreatedBy:   issue.CreatedBy,
+		AssignedTo:  assignedTo,
+		Title:       issue.Title,
+		Description: issue.Description,
+		Status:      string(issue.Status),
+		Priority:    string(issue.Priority),
+		CreatedAt:   issue.CreatedAt.Time,
+		UpdatedAt:   issue.UpdatedAt.Time,
+	}, nil
+}
+
+func (s *IssueService) UpdateIssuePriority(ctx context.Context, requesterID, issueID int64, req dto.UpdateIssuePriority) (dto.IssueResponse, error) {
+	if issueID <= 0 {
+		return dto.IssueResponse{}, ErrInvalidIssueID
+	}
+
+	switch req.Priority {
+	case "LOW", "MEDIUM", "HIGH":
+	default:
+		return dto.IssueResponse{}, ErrInvalidPriority
+	}
+
+	dbIssue, err := s.repo.GetIssueByID(ctx, issueID)
+	if err != nil {
+		if errors.Is(err, repository.ErrIssueNotFound) {
+			return dto.IssueResponse{}, ErrIssueNotFound
+		}
+		return dto.IssueResponse{}, fmt.Errorf("get issue by id: %w", err)
+	}
+
+	if err := s.authz.RequireProjectLead(ctx, dbIssue.ProjectID, requesterID); err != nil {
+		return dto.IssueResponse{}, err
+	}
+
+	issue, err := s.repo.UpdateIssuePriority(ctx, issueID, req.Priority)
+	if err != nil {
+		if errors.Is(err, repository.ErrIssueNotFound) {
+			return dto.IssueResponse{}, ErrIssueNotFound
+		}
+		return dto.IssueResponse{}, fmt.Errorf("update issue priority: %w", err)
+	}
+
+	var assignedTo *int64
+	if issue.AssignedTo.Valid {
+		assignedTo = &issue.AssignedTo.Int64
+	}
+
 	return dto.IssueResponse{
 		ID:          issue.ID,
 		ProjectID:   issue.ProjectID,

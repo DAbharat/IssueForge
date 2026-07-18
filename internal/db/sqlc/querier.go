@@ -39,6 +39,7 @@ type Querier interface {
 	SafeAddMemberToProject(ctx context.Context, arg SafeAddMemberToProjectParams) (ProjectMember, error)
 	UpdateIssueAssignee(ctx context.Context, arg UpdateIssueAssigneeParams) (Issue, error)
 	UpdateIssueDetails(ctx context.Context, arg UpdateIssueDetailsParams) (Issue, error)
+	UpdateIssuePriority(ctx context.Context, arg UpdateIssuePriorityParams) (Issue, error)
 	UpdateIssueStatus(ctx context.Context, arg UpdateIssueStatusParams) (Issue, error)
 }
 

@@ -34,7 +34,7 @@ ORDER BY i.created_at DESC;
 
 -- name: UpdateIssueDetails :one
 UPDATE issues
-SET title = $2, description = $3, priority = $4
+SET title = $2, description = $3
 WHERE id = $1
 RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at;
 
@@ -49,6 +49,13 @@ RETURNING id, project_id, created_by, assigned_to, title, description, status, p
 -- name: UpdateIssueAssignee :one
 UPDATE issues
 SET assigned_to = $2
+WHERE id = $1
+RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at;
+
+
+-- name: UpdateIssuePriority :one
+UPDATE issues
+SET priority = $2
 WHERE id = $1
 RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at;
 

@@ -297,25 +297,49 @@ func (q *Queries) UpdateIssueAssignee(ctx context.Context, arg UpdateIssueAssign
 
 const updateIssueDetails = `-- name: UpdateIssueDetails :one
 UPDATE issues
-SET title = $2, description = $3, priority = $4
+SET title = $2, description = $3
 WHERE id = $1
 RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at
 `
 
 type UpdateIssueDetailsParams struct {
-	ID          int64         `json:"id"`
-	Title       string        `json:"title"`
-	Description string        `json:"description"`
-	Priority    IssuePriority `json:"priority"`
+	ID          int64  `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
 }
 
 func (q *Queries) UpdateIssueDetails(ctx context.Context, arg UpdateIssueDetailsParams) (Issue, error) {
-	row := q.db.QueryRow(ctx, updateIssueDetails,
-		arg.ID,
-		arg.Title,
-		arg.Description,
-		arg.Priority,
+	row := q.db.QueryRow(ctx, updateIssueDetails, arg.ID, arg.Title, arg.Description)
+	var i Issue
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.CreatedBy,
+		&i.AssignedTo,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.Priority,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
+	return i, err
+}
+
+const updateIssuePriority = `-- name: UpdateIssuePriority :one
+UPDATE issues
+SET priority = $2
+WHERE id = $1
+RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at
+`
+
+type UpdateIssuePriorityParams struct {
+	ID       int64         `json:"id"`
+	Priority IssuePriority `json:"priority"`
+}
+
+func (q *Queries) UpdateIssuePriority(ctx context.Context, arg UpdateIssuePriorityParams) (Issue, error) {
+	row := q.db.QueryRow(ctx, updateIssuePriority, arg.ID, arg.Priority)
 	var i Issue
 	err := row.Scan(
 		&i.ID,
