@@ -80,3 +80,9 @@ ORDER BY i.created_at DESC;
 DELETE FROM issues
 WHERE id = $1
 RETURNING id;
+
+
+-- name: GetIssueProjectID :one
+SELECT project_id
+FROM issues
+WHERE id = $1;

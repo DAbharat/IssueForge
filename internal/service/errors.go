@@ -30,4 +30,7 @@ var (
 	ErrInvalidPriority               = errors.New("invalid priority")
 	ErrInvalidAssignee               = errors.New("invalid assignee")
 	ErrForbidden                     = errors.New("forbidden")
+	ErrCommentNotFound               = errors.New("comment not found")
+	ErrInvalidComment                = errors.New("invalid comment")
+	ErrInvalidCommentID              = errors.New("invalid comment id")
 )

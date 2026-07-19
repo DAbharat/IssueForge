@@ -118,6 +118,19 @@ func (q *Queries) GetIssueByID(ctx context.Context, id int64) (GetIssueByIDRow, 
 	return i, err
 }
 
+const getIssueProjectID = `-- name: GetIssueProjectID :one
+SELECT project_id
+FROM issues
+WHERE id = $1
+`
+
+func (q *Queries) GetIssueProjectID(ctx context.Context, id int64) (int64, error) {
+	row := q.db.QueryRow(ctx, getIssueProjectID, id)
+	var project_id int64
+	err := row.Scan(&project_id)
+	return project_id, err
+}
+
 const listAssignedIssues = `-- name: ListAssignedIssues :many
 SELECT i.id, i.project_id, i.title, i.status, i.priority, i.created_at, p.name AS project_name
 FROM issues i

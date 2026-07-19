@@ -16,4 +16,5 @@ var (
 	ErrDuplicateProjectName          = errors.New("a project with this name already exists for this user")
 	ErrIssueNotFound                 = errors.New("issue not found")
 	ErrIssueAlreadyExists            = errors.New("issue already exists")
+	ErrCommentNotFound               = errors.New("comment not found")
 )

@@ -139,6 +139,17 @@ func (ns NullUserRole) Value() (driver.Value, error) {
 	return string(ns.UserRole), nil
 }
 
+type Comment struct {
+	ID              int64              `json:"id"`
+	IssueID         int64              `json:"issue_id"`
+	AuthorID        int64              `json:"author_id"`
+	ParentCommentID pgtype.Int8        `json:"parent_comment_id"`
+	Content         string             `json:"content"`
+	IsEdited        bool               `json:"is_edited"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Issue struct {
 	ID          int64              `json:"id"`
 	ProjectID   int64              `json:"project_id"`

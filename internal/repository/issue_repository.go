@@ -43,9 +43,9 @@ func (r *IssueRepository) CreateIssue(ctx context.Context, projectID, createdBy 
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
-			fmt.Println("PG Code:", pgErr.Code)
-			fmt.Println("Constraint:", pgErr.ConstraintName)
-			fmt.Println("Message:", pgErr.Message)
+			// fmt.Println("PG Code:", pgErr.Code)
+			// fmt.Println("Constraint:", pgErr.ConstraintName)
+			// fmt.Println("Message:", pgErr.Message)
 			switch pgErr.Code {
 			case "23503":
 				switch pgErr.ConstraintName {
@@ -195,4 +195,15 @@ func (r *IssueRepository) DeleteIssue(ctx context.Context, id int64) (int64, err
 		return 0, fmt.Errorf("delete issue: %w", err)
 	}
 	return issue, nil
+}
+
+func (r *IssueRepository) GetIssueProjectID(ctx context.Context, id int64) (int64, error) {
+	projectID, err := r.queries.GetIssueProjectID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, ErrProjectNotFound
+		}
+		return 0, fmt.Errorf("get issue project id: %w", err)
+	}
+	return projectID, nil
 }
