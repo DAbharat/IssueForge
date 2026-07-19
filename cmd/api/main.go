@@ -73,7 +73,11 @@ func main() {
 	issueService := service.NewIssueService(issueRepo, authzService)
 	issueHandler := handler.NewIssueHandler(issueService)
 
-	r := router.New(userHandler, projectHandler, projectMemberHandler, workspaceHandler, workspaceMemberHandler, issueHandler, authMiddleware)
+	commentRepo := repository.NewCommentRepository(queries)
+	commentService := service.NewCommentService(commentRepo, issueRepo, authzService)
+	commentHandler := handler.NewCommentHandler(commentService)
+
+	r := router.New(userHandler, projectHandler, projectMemberHandler, workspaceHandler, workspaceMemberHandler, issueHandler, commentHandler, authMiddleware)
 
 	server := &http.Server{
 		Addr:              serverAddr,
