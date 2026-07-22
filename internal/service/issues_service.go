@@ -24,15 +24,32 @@ type IssueRepo interface {
 	DeleteIssue(ctx context.Context, issueID int64) (int64, error)
 }
 
-type IssueService struct {
-	repo  IssueRepo
-	authz AuthzService
+type ActivityService interface {
+	CreateActivity(ctx context.Context, issueID, actorID int64, activityType string, fieldName, oldValue, newValue *string) (dto.ActivityResponse, error)
 }
 
-func NewIssueService(repo IssueRepo, authz AuthzService) *IssueService {
+type IssueService struct {
+	repo         IssueRepo
+	activityRepo ActivityService
+	authz        AuthzService
+}
+
+func NewIssueService(repo IssueRepo, activity ActivityService, authz AuthzService) *IssueService {
 	return &IssueService{
-		repo:  repo,
-		authz: authz,
+		repo:         repo,
+		activityRepo: activity,
+		authz:        authz,
+	}
+}
+
+func strPtrEqual(a, b *string) bool {
+	switch {
+	case a == nil && b == nil:
+		return true
+	case a == nil || b == nil:
+		return false
+	default:
+		return *a == *b
 	}
 }
 
@@ -80,6 +97,11 @@ func (s *IssueService) CreateIssue(ctx context.Context, creatorID int64, req dto
 	issue, err := s.repo.CreateIssue(ctx, req.ProjectID, creatorID, req.AssignedTo, issueTitle, issueDescription, req.Status, req.Priority)
 	if err != nil {
 		return dto.CreateIssueResponse{}, fmt.Errorf("create issue: %w", err)
+	}
+
+	_, err = s.activityRepo.CreateActivity(ctx, issue.ID, creatorID, "ISSUE_CREATED", nil, nil, nil)
+	if err != nil {
+		return dto.CreateIssueResponse{}, err
 	}
 
 	var assignedTo *int64
@@ -204,7 +226,7 @@ func (s *IssueService) UpdateIssueDetails(ctx context.Context, requesterID, issu
 	issueTitle := strings.TrimSpace(req.Title)
 
 	if req.Description != nil {
-		description := strings.TrimSpace(*req.Description)
+		description = strings.TrimSpace(*req.Description)
 
 		if utf8.RuneCountInString(description) < 10 || utf8.RuneCountInString(description) > 300 {
 			return dto.IssueResponse{}, ErrInvalidDescription
@@ -230,21 +252,48 @@ func (s *IssueService) UpdateIssueDetails(ctx context.Context, requesterID, issu
 		return dto.IssueResponse{}, fmt.Errorf("update issue details: %w", err)
 	}
 
+	titleField := "title"
+	oldTitle := dbIssue.Title
+	newTitle := issues.Title
+
+	descField := "description"
+	oldDesc := dbIssue.Description
+	newDesc := issues.Description
+
+	if oldTitle != newTitle {
+		_, err = s.activityRepo.CreateActivity(ctx, issues.ID, requesterID, "ISSUE_DETAILS_UPDATED", &titleField, &oldTitle, &newTitle)
+		if err != nil {
+			return dto.IssueResponse{}, err
+		}
+	}
+
+	if oldDesc != newDesc {
+		_, err = s.activityRepo.CreateActivity(ctx, issues.ID, requesterID, "ISSUE_DETAILS_UPDATED", &descField, &oldDesc, &newDesc)
+		if err != nil {
+			return dto.IssueResponse{}, err
+		}
+	}
+
 	var assignedTo *int64
 	if issues.AssignedTo.Valid {
 		assignedTo = &issues.AssignedTo.Int64
 	}
+	var assigneeName *string
+	if dbIssue.AssigneeName.Valid {
+		assigneeName = &dbIssue.AssigneeName.String
+	}
 	return dto.IssueResponse{
-		ID:          issues.ID,
-		ProjectID:   issues.ProjectID,
-		CreatedBy:   issues.CreatedBy,
-		AssignedTo:  assignedTo,
-		Title:       issues.Title,
-		Description: issues.Description,
-		Status:      string(issues.Status),
-		Priority:    string(issues.Priority),
-		CreatedAt:   issues.CreatedAt.Time,
-		UpdatedAt:   issues.UpdatedAt.Time,
+		ID:           issues.ID,
+		ProjectID:    issues.ProjectID,
+		CreatedBy:    issues.CreatedBy,
+		AssignedTo:   assignedTo,
+		AssigneeName: assigneeName,
+		Title:        issues.Title,
+		Description:  issues.Description,
+		Status:       string(issues.Status),
+		Priority:     string(issues.Priority),
+		CreatedAt:    issues.CreatedAt.Time,
+		UpdatedAt:    issues.UpdatedAt.Time,
 	}, nil
 }
 
@@ -268,6 +317,7 @@ func (s *IssueService) UpdateIssueStatus(ctx context.Context, requesterID, issue
 		return dto.IssueResponse{}, err
 	}
 
+	oldStatus := string(dbIssue.Status)
 	issue, err := s.repo.UpdateIssueStatus(ctx, issueID, req.Status)
 	if err != nil {
 		if errors.Is(err, repository.ErrIssueNotFound) {
@@ -275,22 +325,37 @@ func (s *IssueService) UpdateIssueStatus(ctx context.Context, requesterID, issue
 		}
 		return dto.IssueResponse{}, fmt.Errorf("update issue status: %w", err)
 	}
+	newStatus := string(issue.Status)
+
+	field := "status"
+
+	if oldStatus != newStatus {
+		_, err = s.activityRepo.CreateActivity(ctx, issue.ID, requesterID, "ISSUE_STATUS_CHANGED", &field, &oldStatus, &newStatus)
+		if err != nil {
+			return dto.IssueResponse{}, err
+		}
+	}
 
 	var assignedTo *int64
 	if issue.AssignedTo.Valid {
 		assignedTo = &issue.AssignedTo.Int64
 	}
+	var assigneeName *string
+	if dbIssue.AssigneeName.Valid {
+		assigneeName = &dbIssue.AssigneeName.String
+	}
 	return dto.IssueResponse{
-		ID:          issue.ID,
-		ProjectID:   issue.ProjectID,
-		CreatedBy:   issue.CreatedBy,
-		AssignedTo:  assignedTo,
-		Title:       issue.Title,
-		Description: issue.Description,
-		Status:      string(issue.Status),
-		Priority:    string(issue.Priority),
-		CreatedAt:   issue.CreatedAt.Time,
-		UpdatedAt:   issue.UpdatedAt.Time,
+		ID:           issue.ID,
+		ProjectID:    issue.ProjectID,
+		CreatedBy:    issue.CreatedBy,
+		AssignedTo:   assignedTo,
+		AssigneeName: assigneeName,
+		Title:        issue.Title,
+		Description:  issue.Description,
+		Status:       string(issue.Status),
+		Priority:     string(issue.Priority),
+		CreatedAt:    issue.CreatedAt.Time,
+		UpdatedAt:    issue.UpdatedAt.Time,
 	}, nil
 }
 
@@ -321,6 +386,11 @@ func (s *IssueService) UpdateIssueAssignee(ctx context.Context, requesterID, iss
 		}
 	}
 
+	var oldAssignee *string
+	if dbIssue.AssigneeName.Valid {
+		oldAssignee = &dbIssue.AssigneeName.String
+	}
+
 	issue, err := s.repo.UpdateIssueAssignee(ctx, issueID, req.AssignedTo)
 	if err != nil {
 		if errors.Is(err, repository.ErrIssueNotFound) {
@@ -332,21 +402,48 @@ func (s *IssueService) UpdateIssueAssignee(ctx context.Context, requesterID, iss
 		return dto.IssueResponse{}, fmt.Errorf("update issue assignee: %w", err)
 	}
 
+	updatedIssueWithNames, err := s.repo.GetIssueByID(ctx, issueID)
+	if err != nil {
+		if errors.Is(err, repository.ErrIssueNotFound) {
+			return dto.IssueResponse{}, ErrIssueNotFound
+		}
+		return dto.IssueResponse{}, fmt.Errorf("get issue by id(name): %w", err)
+	}
+
+	var newAssignee *string
+	if updatedIssueWithNames.AssigneeName.Valid {
+		newAssignee = &updatedIssueWithNames.AssigneeName.String
+	}
+
+	field := "assignee"
+
+	if !strPtrEqual(oldAssignee, newAssignee) {
+		_, err = s.activityRepo.CreateActivity(ctx, issue.ID, requesterID, "ISSUE_ASSIGNEE_CHANGED", &field, oldAssignee, newAssignee)
+		if err != nil {
+			return dto.IssueResponse{}, err
+		}
+	}
+
 	var assignedTo *int64
 	if issue.AssignedTo.Valid {
 		assignedTo = &issue.AssignedTo.Int64
 	}
+	var assigneeName *string
+	if updatedIssueWithNames.AssigneeName.Valid {
+		assigneeName = &updatedIssueWithNames.AssigneeName.String
+	}
 	return dto.IssueResponse{
-		ID:          issue.ID,
-		ProjectID:   issue.ProjectID,
-		CreatedBy:   issue.CreatedBy,
-		AssignedTo:  assignedTo,
-		Title:       issue.Title,
-		Description: issue.Description,
-		Status:      string(issue.Status),
-		Priority:    string(issue.Priority),
-		CreatedAt:   issue.CreatedAt.Time,
-		UpdatedAt:   issue.UpdatedAt.Time,
+		ID:           issue.ID,
+		ProjectID:    issue.ProjectID,
+		CreatedBy:    issue.CreatedBy,
+		AssignedTo:   assignedTo,
+		AssigneeName: assigneeName,
+		Title:        issue.Title,
+		Description:  issue.Description,
+		Status:       string(issue.Status),
+		Priority:     string(issue.Priority),
+		CreatedAt:    issue.CreatedAt.Time,
+		UpdatedAt:    issue.UpdatedAt.Time,
 	}, nil
 }
 
@@ -373,6 +470,7 @@ func (s *IssueService) UpdateIssuePriority(ctx context.Context, requesterID, iss
 		return dto.IssueResponse{}, err
 	}
 
+	oldPriority := string(dbIssue.Priority)
 	issue, err := s.repo.UpdateIssuePriority(ctx, issueID, req.Priority)
 	if err != nil {
 		if errors.Is(err, repository.ErrIssueNotFound) {
@@ -380,23 +478,37 @@ func (s *IssueService) UpdateIssuePriority(ctx context.Context, requesterID, iss
 		}
 		return dto.IssueResponse{}, fmt.Errorf("update issue priority: %w", err)
 	}
+	newPriority := string(issue.Priority)
+
+	field := "priority"
+
+	if oldPriority != newPriority {
+		_, err = s.activityRepo.CreateActivity(ctx, issue.ID, requesterID, "ISSUE_PRIORITY_CHANGED", &field, &oldPriority, &newPriority)
+		if err != nil {
+			return dto.IssueResponse{}, err
+		}
+	}
 
 	var assignedTo *int64
 	if issue.AssignedTo.Valid {
 		assignedTo = &issue.AssignedTo.Int64
 	}
-
+	var assigneeName *string
+	if dbIssue.AssigneeName.Valid {
+		assigneeName = &dbIssue.AssigneeName.String
+	}
 	return dto.IssueResponse{
-		ID:          issue.ID,
-		ProjectID:   issue.ProjectID,
-		CreatedBy:   issue.CreatedBy,
-		AssignedTo:  assignedTo,
-		Title:       issue.Title,
-		Description: issue.Description,
-		Status:      string(issue.Status),
-		Priority:    string(issue.Priority),
-		CreatedAt:   issue.CreatedAt.Time,
-		UpdatedAt:   issue.UpdatedAt.Time,
+		ID:           issue.ID,
+		ProjectID:    issue.ProjectID,
+		CreatedBy:    issue.CreatedBy,
+		AssignedTo:   assignedTo,
+		AssigneeName: assigneeName,
+		Title:        issue.Title,
+		Description:  issue.Description,
+		Status:       string(issue.Status),
+		Priority:     string(issue.Priority),
+		CreatedAt:    issue.CreatedAt.Time,
+		UpdatedAt:    issue.UpdatedAt.Time,
 	}, nil
 }
 
@@ -479,6 +591,11 @@ func (s *IssueService) DeleteIssue(ctx context.Context, requesterID, issueID int
 			return 0, ErrIssueNotFound
 		}
 		return 0, fmt.Errorf("delete issue: %w", err)
+	}
+
+	_, err = s.activityRepo.CreateActivity(ctx, dbIssue.ID, requesterID, "ISSUE_DELETED", nil, nil, nil)
+	if err != nil {
+		return 0, err
 	}
 	return id, nil
 }
