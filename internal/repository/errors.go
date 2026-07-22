@@ -17,4 +17,6 @@ var (
 	ErrIssueNotFound                 = errors.New("issue not found")
 	ErrIssueAlreadyExists            = errors.New("issue already exists")
 	ErrCommentNotFound               = errors.New("comment not found")
+	ErrInvalidActorID                = errors.New("invalid actor id")
+	ErrInvalidActivityType           = errors.New("invalid activity type")
 )

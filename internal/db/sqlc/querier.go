@@ -13,6 +13,7 @@ import (
 type Querier interface {
 	AddMemberToProject(ctx context.Context, arg AddMemberToProjectParams) (ProjectMember, error)
 	AddWorkspaceMember(ctx context.Context, arg AddWorkspaceMemberParams) (WorkspaceMember, error)
+	CreateActivity(ctx context.Context, arg CreateActivityParams) (IssueActivity, error)
 	CreateComment(ctx context.Context, arg CreateCommentParams) (Comment, error)
 	CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue, error)
 	CreateOnboardingUser(ctx context.Context, arg CreateOnboardingUserParams) (CreateOnboardingUserRow, error)
@@ -33,6 +34,7 @@ type Querier interface {
 	IsWorkspaceMember(ctx context.Context, arg IsWorkspaceMemberParams) (UserRole, error)
 	ListAssignedIssues(ctx context.Context, assignedTo pgtype.Int8) ([]ListAssignedIssuesRow, error)
 	ListCreatedIssues(ctx context.Context, createdBy int64) ([]ListCreatedIssuesRow, error)
+	ListIssueActivities(ctx context.Context, arg ListIssueActivitiesParams) ([]ListIssueActivitiesRow, error)
 	ListIssueComments(ctx context.Context, arg ListIssueCommentsParams) ([]ListIssueCommentsRow, error)
 	ListProjectIssues(ctx context.Context, projectID int64) ([]ListProjectIssuesRow, error)
 	ListProjectMembers(ctx context.Context, projectID int64) ([]ListProjectMembersRow, error)
@@ -41,6 +43,7 @@ type Querier interface {
 	ListUserWorkspaces(ctx context.Context, arg ListUserWorkspacesParams) ([]ListUserWorkspacesRow, error)
 	ListWorkspaceMembers(ctx context.Context, workspaceID int64) ([]ListWorkspaceMembersRow, error)
 	RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) (RemoveWorkspaceMemberRow, error)
+	RestoreIssue(ctx context.Context, id int64) (int64, error)
 	SafeAddMemberToProject(ctx context.Context, arg SafeAddMemberToProjectParams) (ProjectMember, error)
 	UpdateComment(ctx context.Context, arg UpdateCommentParams) (Comment, error)
 	UpdateIssueAssignee(ctx context.Context, arg UpdateIssueAssigneeParams) (Issue, error)

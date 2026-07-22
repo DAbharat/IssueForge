@@ -33,4 +33,6 @@ var (
 	ErrCommentNotFound               = errors.New("comment not found")
 	ErrInvalidComment                = errors.New("invalid comment")
 	ErrInvalidCommentID              = errors.New("invalid comment id")
+	ErrInvalidActorID                = errors.New("invalid actor id")
+	ErrInvalidActivityType           = errors.New("invalid activity type")
 )

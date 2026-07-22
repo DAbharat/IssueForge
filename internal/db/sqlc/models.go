@@ -11,6 +11,56 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ActivityType string
+
+const (
+	ActivityTypeISSUECREATED         ActivityType = "ISSUE_CREATED"
+	ActivityTypeISSUEDETAILSUPDATED  ActivityType = "ISSUE_DETAILS_UPDATED"
+	ActivityTypeISSUESTATUSCHANGED   ActivityType = "ISSUE_STATUS_CHANGED"
+	ActivityTypeISSUEPRIORITYCHANGED ActivityType = "ISSUE_PRIORITY_CHANGED"
+	ActivityTypeISSUEASSIGNEECHANGED ActivityType = "ISSUE_ASSIGNEE_CHANGED"
+	ActivityTypeISSUEDELETED         ActivityType = "ISSUE_DELETED"
+	ActivityTypeISSUERESTORED        ActivityType = "ISSUE_RESTORED"
+	ActivityTypeCOMMENTCREATED       ActivityType = "COMMENT_CREATED"
+	ActivityTypeCOMMENTUPDATED       ActivityType = "COMMENT_UPDATED"
+	ActivityTypeCOMMENTDELETED       ActivityType = "COMMENT_DELETED"
+)
+
+func (e *ActivityType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ActivityType(s)
+	case string:
+		*e = ActivityType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ActivityType: %T", src)
+	}
+	return nil
+}
+
+type NullActivityType struct {
+	ActivityType ActivityType `json:"activity_type"`
+	Valid        bool         `json:"valid"` // Valid is true if ActivityType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullActivityType) Scan(value interface{}) error {
+	if value == nil {
+		ns.ActivityType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ActivityType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullActivityType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ActivityType), nil
+}
+
 type IssuePriority string
 
 const (
@@ -161,6 +211,18 @@ type Issue struct {
 	Priority    IssuePriority      `json:"priority"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type IssueActivity struct {
+	ID           int64              `json:"id"`
+	IssueID      int64              `json:"issue_id"`
+	ActorID      int64              `json:"actor_id"`
+	ActivityType ActivityType       `json:"activity_type"`
+	FieldName    pgtype.Text        `json:"field_name"`
+	OldValue     pgtype.Text        `json:"old_value"`
+	NewValue     pgtype.Text        `json:"new_value"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 }
 
 type Project struct {

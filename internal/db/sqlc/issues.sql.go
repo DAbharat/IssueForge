@@ -23,7 +23,7 @@ INSERT INTO issues(
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7
 )
-RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at
+RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at, deleted_at
 `
 
 type CreateIssueParams struct {
@@ -58,13 +58,15 @@ func (q *Queries) CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue
 		&i.Priority,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const deleteIssue = `-- name: DeleteIssue :one
-DELETE FROM issues
-WHERE id = $1
+UPDATE issues
+SET deleted_at = NOW()
+WHERE id = $1 AND deleted_at IS NULL
 RETURNING id
 `
 
@@ -76,11 +78,11 @@ func (q *Queries) DeleteIssue(ctx context.Context, id int64) (int64, error) {
 }
 
 const getIssueByID = `-- name: GetIssueByID :one
-SELECT i.id, i.project_id, i.created_by, i.assigned_to, i.title, i.description, i.status, i.priority, i.created_at, i.updated_at, creator.display_name AS creator_name, assignee.display_name AS assignee_name
+SELECT i.id, i.project_id, i.created_by, i.assigned_to, i.title, i.description, i.status, i.priority, i.created_at, i.updated_at, creator.display_name AS creator_name, assignee.display_name AS assignee_name, deleted_at
 FROM issues i
 JOIN users creator ON i.created_by = creator.id
 LEFT JOIN users assignee ON i.assigned_to = assignee.id
-WHERE i.id = $1
+WHERE i.id = $1 AND i.deleted_at IS NULL
 `
 
 type GetIssueByIDRow struct {
@@ -96,6 +98,7 @@ type GetIssueByIDRow struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 	CreatorName  string             `json:"creator_name"`
 	AssigneeName pgtype.Text        `json:"assignee_name"`
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
 }
 
 func (q *Queries) GetIssueByID(ctx context.Context, id int64) (GetIssueByIDRow, error) {
@@ -114,6 +117,7 @@ func (q *Queries) GetIssueByID(ctx context.Context, id int64) (GetIssueByIDRow, 
 		&i.UpdatedAt,
 		&i.CreatorName,
 		&i.AssigneeName,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -121,7 +125,7 @@ func (q *Queries) GetIssueByID(ctx context.Context, id int64) (GetIssueByIDRow, 
 const getIssueProjectID = `-- name: GetIssueProjectID :one
 SELECT project_id
 FROM issues
-WHERE id = $1
+WHERE id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetIssueProjectID(ctx context.Context, id int64) (int64, error) {
@@ -132,10 +136,10 @@ func (q *Queries) GetIssueProjectID(ctx context.Context, id int64) (int64, error
 }
 
 const listAssignedIssues = `-- name: ListAssignedIssues :many
-SELECT i.id, i.project_id, i.title, i.status, i.priority, i.created_at, p.name AS project_name
+SELECT i.id, i.project_id, i.title, i.status, i.priority, i.created_at, i.deleted_at, p.name AS project_name
 FROM issues i
 JOIN projects p ON i.project_id = p.id
-WHERE i.assigned_to = $1
+WHERE i.assigned_to = $1 AND i.deleted_at IS NULL
 ORDER BY i.created_at DESC
 `
 
@@ -146,6 +150,7 @@ type ListAssignedIssuesRow struct {
 	Status      IssueStatus        `json:"status"`
 	Priority    IssuePriority      `json:"priority"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 	ProjectName string             `json:"project_name"`
 }
 
@@ -165,6 +170,7 @@ func (q *Queries) ListAssignedIssues(ctx context.Context, assignedTo pgtype.Int8
 			&i.Status,
 			&i.Priority,
 			&i.CreatedAt,
+			&i.DeletedAt,
 			&i.ProjectName,
 		); err != nil {
 			return nil, err
@@ -178,10 +184,10 @@ func (q *Queries) ListAssignedIssues(ctx context.Context, assignedTo pgtype.Int8
 }
 
 const listCreatedIssues = `-- name: ListCreatedIssues :many
-SELECT i.id, i.project_id, i.title, i.status, i.priority, i.created_at, p.name AS project_name
+SELECT i.id, i.project_id, i.title, i.status, i.priority, i.created_at, i.deleted_at, p.name AS project_name
 FROM issues i
 JOIN projects p ON i.project_id = p.id
-WHERE i.created_by = $1
+WHERE i.created_by = $1 AND i.deleted_at IS NULL
 ORDER BY i.created_at DESC
 `
 
@@ -192,6 +198,7 @@ type ListCreatedIssuesRow struct {
 	Status      IssueStatus        `json:"status"`
 	Priority    IssuePriority      `json:"priority"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 	ProjectName string             `json:"project_name"`
 }
 
@@ -211,6 +218,7 @@ func (q *Queries) ListCreatedIssues(ctx context.Context, createdBy int64) ([]Lis
 			&i.Status,
 			&i.Priority,
 			&i.CreatedAt,
+			&i.DeletedAt,
 			&i.ProjectName,
 		); err != nil {
 			return nil, err
@@ -224,13 +232,13 @@ func (q *Queries) ListCreatedIssues(ctx context.Context, createdBy int64) ([]Lis
 }
 
 const listProjectIssues = `-- name: ListProjectIssues :many
-SELECT i.id, i.project_id, i.title, i.status, i.priority, i.created_at, i.assigned_to, i.created_by, 
+SELECT i.id, i.project_id, i.title, i.status, i.priority, i.created_at, i.assigned_to, i.created_by, i.deleted_at,
        u_creator.display_name AS creator_name,
        u_assignee.display_name AS assignee_name
 FROM issues i
 INNER JOIN users u_creator ON i.created_by = u_creator.id
 LEFT JOIN users u_assignee ON i.assigned_to = u_assignee.id
-WHERE i.project_id = $1
+WHERE i.project_id = $1 AND i.deleted_at IS NULL
 ORDER BY i.created_at DESC
 `
 
@@ -243,6 +251,7 @@ type ListProjectIssuesRow struct {
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	AssignedTo   pgtype.Int8        `json:"assigned_to"`
 	CreatedBy    int64              `json:"created_by"`
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
 	CreatorName  string             `json:"creator_name"`
 	AssigneeName pgtype.Text        `json:"assignee_name"`
 }
@@ -265,6 +274,7 @@ func (q *Queries) ListProjectIssues(ctx context.Context, projectID int64) ([]Lis
 			&i.CreatedAt,
 			&i.AssignedTo,
 			&i.CreatedBy,
+			&i.DeletedAt,
 			&i.CreatorName,
 			&i.AssigneeName,
 		); err != nil {
@@ -278,11 +288,25 @@ func (q *Queries) ListProjectIssues(ctx context.Context, projectID int64) ([]Lis
 	return items, nil
 }
 
+const restoreIssue = `-- name: RestoreIssue :one
+UPDATE issues
+SET deleted_at = NULL
+WHERE id = $1 AND deleted_at IS NOT NULL
+RETURNING id
+`
+
+func (q *Queries) RestoreIssue(ctx context.Context, id int64) (int64, error) {
+	row := q.db.QueryRow(ctx, restoreIssue, id)
+	var id_2 int64
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
 const updateIssueAssignee = `-- name: UpdateIssueAssignee :one
 UPDATE issues
 SET assigned_to = $2
-WHERE id = $1
-RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at, deleted_at
 `
 
 type UpdateIssueAssigneeParams struct {
@@ -304,6 +328,7 @@ func (q *Queries) UpdateIssueAssignee(ctx context.Context, arg UpdateIssueAssign
 		&i.Priority,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -311,8 +336,8 @@ func (q *Queries) UpdateIssueAssignee(ctx context.Context, arg UpdateIssueAssign
 const updateIssueDetails = `-- name: UpdateIssueDetails :one
 UPDATE issues
 SET title = $2, description = $3
-WHERE id = $1
-RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at, deleted_at
 `
 
 type UpdateIssueDetailsParams struct {
@@ -335,6 +360,7 @@ func (q *Queries) UpdateIssueDetails(ctx context.Context, arg UpdateIssueDetails
 		&i.Priority,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -342,8 +368,8 @@ func (q *Queries) UpdateIssueDetails(ctx context.Context, arg UpdateIssueDetails
 const updateIssuePriority = `-- name: UpdateIssuePriority :one
 UPDATE issues
 SET priority = $2
-WHERE id = $1
-RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at, deleted_at
 `
 
 type UpdateIssuePriorityParams struct {
@@ -365,6 +391,7 @@ func (q *Queries) UpdateIssuePriority(ctx context.Context, arg UpdateIssuePriori
 		&i.Priority,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -372,8 +399,8 @@ func (q *Queries) UpdateIssuePriority(ctx context.Context, arg UpdateIssuePriori
 const updateIssueStatus = `-- name: UpdateIssueStatus :one
 UPDATE issues
 SET status = $2
-WHERE id = $1
-RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at, deleted_at
 `
 
 type UpdateIssueStatusParams struct {
@@ -395,6 +422,7 @@ func (q *Queries) UpdateIssueStatus(ctx context.Context, arg UpdateIssueStatusPa
 		&i.Priority,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
