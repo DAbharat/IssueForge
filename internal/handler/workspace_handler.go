@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"IssueForge/internal/auth"
 	"IssueForge/internal/dto"
 	"IssueForge/internal/httpx"
 	"IssueForge/internal/middleware"
@@ -59,6 +58,8 @@ func (h *WorkspaceHandler) CreateWorkspace(w http.ResponseWriter, r *http.Reques
 	workspace, err := h.workspaceService.CreateWorkspace(r.Context(), creatorID, req)
 	if err != nil {
 		switch {
+		case errors.Is(err, service.ErrForbidden):
+			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidWorkspaceName):
 			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
 		case errors.Is(err, repository.ErrWorkspaceAlreadyExists):
@@ -90,7 +91,7 @@ func (h *WorkspaceHandler) GetWorkspaceByID(w http.ResponseWriter, r *http.Reque
 	workspace, err := h.workspaceService.GetWorkspaceByID(r.Context(), workspaceID, userID)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, repository.ErrWorkspaceNotFound):
 			httpx.RespondWithError(w, http.StatusNotFound, err.Error())

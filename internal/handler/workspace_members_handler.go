@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"IssueForge/internal/auth"
 	"IssueForge/internal/dto"
 	"IssueForge/internal/httpx"
 	"IssueForge/internal/middleware"
@@ -69,7 +68,7 @@ func (h *WorkspaceMemberHandler) AddWorkspaceMember(w http.ResponseWriter, r *ht
 	member, err := h.workspaceMemberService.AddWorkspaceMember(r.Context(), adminID, workspaceID, req)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, repository.ErrWorkspaceMemberAlreadyExists):
 			httpx.RespondWithError(w, http.StatusConflict, err.Error())
@@ -113,7 +112,7 @@ func (h *WorkspaceMemberHandler) GetWorkspaceMember(w http.ResponseWriter, r *ht
 	member, err := h.workspaceMemberService.GetWorkspaceMember(r.Context(), workspaceID, requesterID, userID)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, repository.ErrWorkspaceMemberNotFound):
 			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
@@ -162,7 +161,7 @@ func (h *WorkspaceMemberHandler) ListWorkspaceMembers(w http.ResponseWriter, r *
 	member, err := h.workspaceMemberService.ListWorkspaceMembers(r.Context(), workspaceID, userID)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		default:
 			log.Printf("list workspace members fail: %v", err)
@@ -198,7 +197,7 @@ func (h *WorkspaceMemberHandler) RemoveWorkspaceMember(w http.ResponseWriter, r 
 	member, err := h.workspaceMemberService.RemoveWorkspaceMember(r.Context(), workspaceID, adminID, targetUserID)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, repository.ErrWorkspaceMemberNotFound):
 			httpx.RespondWithError(w, http.StatusNotFound, err.Error())

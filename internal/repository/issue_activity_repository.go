@@ -14,7 +14,7 @@ type ActivityRepository struct {
 	queries *sqlc.Queries
 }
 
-func NewActivityRepository(queries *sqlc.Queries) *ActivityRepository {
+func NewIssueActivityRepository(queries *sqlc.Queries) *ActivityRepository {
 	return &ActivityRepository{
 		queries: queries,
 	}

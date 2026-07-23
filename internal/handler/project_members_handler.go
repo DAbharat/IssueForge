@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"IssueForge/internal/auth"
 	"IssueForge/internal/dto"
 	"IssueForge/internal/httpx"
 	"IssueForge/internal/middleware"
 	"IssueForge/internal/repository"
+	"IssueForge/internal/service"
 	"context"
 	"encoding/json"
 	"errors"
@@ -64,7 +64,7 @@ func (h *ProjectMemberHandler) SafeAddMemberToProject(w http.ResponseWriter, r *
 	member, err := h.projectMemberService.SafeAddMemberToProject(r.Context(), req, projectID, leadID)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusUnauthorized, err.Error())
 		case errors.Is(err, repository.ErrProjectMemberValidationFailed):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
@@ -101,7 +101,7 @@ func (h *ProjectMemberHandler) ListProjectMembers(w http.ResponseWriter, r *http
 	members, err := h.projectMemberService.ListProjectMembers(r.Context(), projectID, userID)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		default:
 			log.Printf("list project by members fail: %v", err)

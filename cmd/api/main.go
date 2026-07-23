@@ -70,14 +70,20 @@ func main() {
 	workspaceHandler := handler.NewWorkspaceHandler(workspaceService)
 
 	issueRepo := repository.NewIssueRepository(queries)
-	issueService := service.NewIssueService(issueRepo, authzService)
+
+	issueActivityRepo := repository.NewIssueActivityRepository(queries)
+	issueActivityService := service.NewIssueActivityService(issueActivityRepo, issueRepo, authzService)
+
+	issueService := service.NewIssueService(issueRepo, issueActivityService, authzService)
 	issueHandler := handler.NewIssueHandler(issueService)
 
 	commentRepo := repository.NewCommentRepository(queries)
-	commentService := service.NewCommentService(commentRepo, issueRepo, authzService)
+	commentService := service.NewCommentService(commentRepo, issueRepo, issueActivityService, authzService)
 	commentHandler := handler.NewCommentHandler(commentService)
 
-	r := router.New(userHandler, projectHandler, projectMemberHandler, workspaceHandler, workspaceMemberHandler, issueHandler, commentHandler, authMiddleware)
+	issueActivityHandler := handler.NewIssueActivityHandler(issueActivityService)
+
+	r := router.New(userHandler, projectHandler, projectMemberHandler, workspaceHandler, workspaceMemberHandler, issueHandler, commentHandler, issueActivityHandler, authMiddleware)
 
 	server := &http.Server{
 		Addr:              serverAddr,

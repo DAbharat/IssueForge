@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"IssueForge/internal/auth"
 	"IssueForge/internal/dto"
 	"IssueForge/internal/httpx"
 	"IssueForge/internal/middleware"
@@ -75,7 +74,7 @@ func (h *IssueHandler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 	issue, err := h.issueService.CreateIssue(r.Context(), creatorID, req)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidProjectID),
 			errors.Is(err, service.ErrInvalidAssignee),
@@ -114,7 +113,7 @@ func (h *IssueHandler) GetIssueByID(w http.ResponseWriter, r *http.Request) {
 	issue, err := h.issueService.GetIssueByID(r.Context(), requesterID, issueID)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidIssueID):
 			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -147,7 +146,7 @@ func (h *IssueHandler) ListProjectIssues(w http.ResponseWriter, r *http.Request)
 	issue, err := h.issueService.ListProjectIssues(r.Context(), requesterID, projectID)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrProjectNotFound):
 			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
@@ -195,7 +194,7 @@ func (h *IssueHandler) UpdateIssueDetails(w http.ResponseWriter, r *http.Request
 	issue, err := h.issueService.UpdateIssueDetails(r.Context(), requesterID, issueID, req)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidIssueID):
 			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -249,7 +248,7 @@ func (h *IssueHandler) UpdateIssueStatus(w http.ResponseWriter, r *http.Request)
 	issue, err := h.issueService.UpdateIssueStatus(r.Context(), requesterID, issueID, req)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidIssueID):
 			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -299,7 +298,7 @@ func (h *IssueHandler) UpdateIssueAssignee(w http.ResponseWriter, r *http.Reques
 	issue, err := h.issueService.UpdateIssueAssignee(r.Context(), requesterID, issueID, req)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidIssueID),
 			errors.Is(err, service.ErrInvalidAssignee):
@@ -349,7 +348,7 @@ func (h *IssueHandler) UpdateIssuePriority(w http.ResponseWriter, r *http.Reques
 	issue, err := h.issueService.UpdateIssuePriority(r.Context(), requesterID, issueID, req)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrIssueNotFound):
 			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
@@ -377,7 +376,7 @@ func (h *IssueHandler) ListAssignedIssues(w http.ResponseWriter, r *http.Request
 	issues, err := h.issueService.ListAssignedIssues(r.Context(), requesterID, assignedTo)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidAssignee):
 			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -402,7 +401,7 @@ func (h *IssueHandler) ListCreatedIssues(w http.ResponseWriter, r *http.Request)
 	issues, err := h.issueService.ListCreatedIssues(r.Context(), requesterID, createdBy)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidUserID):
 			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -433,7 +432,7 @@ func (h *IssueHandler) DeleteIssue(w http.ResponseWriter, r *http.Request) {
 	issue, err := h.issueService.DeleteIssue(r.Context(), requesterID, issueID)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidIssueID):
 			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())

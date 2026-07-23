@@ -24,16 +24,18 @@ type IssueLookupRepo interface {
 }
 
 type CommentService struct {
-	repo      CommentRepo
-	issueRepo IssueLookupRepo
-	authz     AuthzService
+	repo         CommentRepo
+	issueRepo    IssueLookupRepo
+	activityRepo ActivityService
+	authz        AuthzService
 }
 
-func NewCommentService(repo CommentRepo, issueRepo IssueLookupRepo, authz AuthzService) *CommentService {
+func NewCommentService(repo CommentRepo, issueRepo IssueLookupRepo, activity ActivityService, authz AuthzService) *CommentService {
 	return &CommentService{
-		repo:      repo,
-		issueRepo: issueRepo,
-		authz:     authz,
+		repo:         repo,
+		issueRepo:    issueRepo,
+		activityRepo: activity,
+		authz:        authz,
 	}
 }
 
@@ -79,6 +81,11 @@ func (s *CommentService) CreateComment(ctx context.Context, requesterID int64, r
 			return dto.CommentResponse{}, ErrUserNotFound
 		}
 		return dto.CommentResponse{}, fmt.Errorf("create comment: %w", err)
+	}
+
+	_, err = s.activityRepo.CreateActivity(ctx, comment.IssueID, requesterID, "COMMENT_CREATED", nil, nil, nil)
+	if err != nil {
+		return dto.CommentResponse{}, err
 	}
 
 	var parentComment *int64
@@ -220,12 +227,23 @@ func (s *CommentService) UpdateComment(ctx context.Context, commentID, requester
 		return dto.CommentResponse{}, ErrForbidden
 	}
 
+	oldComment := dbComment.Content
 	comment, err := s.repo.UpdateComment(ctx, commentID, commentContent)
 	if err != nil {
 		if errors.Is(err, repository.ErrCommentNotFound) {
 			return dto.CommentResponse{}, ErrCommentNotFound
 		}
 		return dto.CommentResponse{}, fmt.Errorf("update comment: %w", err)
+	}
+	newComment := comment.Content
+
+	field := "comment"
+
+	if oldComment != newComment {
+		_, err := s.activityRepo.CreateActivity(ctx, comment.IssueID, requesterID, "COMMENT_UPDATED", &field, &oldComment, &newComment)
+		if err != nil {
+			return dto.CommentResponse{}, err
+		}
 	}
 
 	var parentComment *int64
@@ -270,6 +288,11 @@ func (s *CommentService) DeleteComment(ctx context.Context, requesterID, comment
 			return 0, ErrCommentNotFound
 		}
 		return 0, fmt.Errorf("delete comment: %w", err)
+	}
+
+	_, err = s.activityRepo.CreateActivity(ctx, comment.IssueID, requesterID, "COMMENT_DELETED", nil, nil, nil)
+	if err != nil {
+		return 0, err
 	}
 	return id, nil
 }

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"IssueForge/internal/auth"
 	"IssueForge/internal/dto"
 	"IssueForge/internal/httpx"
 	"IssueForge/internal/middleware"
@@ -69,7 +68,7 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	comment, err := h.commentService.CreateComment(r.Context(), requesterID, req)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidIssueID),
 			errors.Is(err, service.ErrInvalidComment):
@@ -105,7 +104,7 @@ func (h *CommentHandler) GetCommentByID(w http.ResponseWriter, r *http.Request) 
 	comment, err := h.commentService.GetCommentByID(r.Context(), requesterID, commentID)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidCommentID):
 			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -168,7 +167,7 @@ func (h *CommentHandler) ListIssueComments(w http.ResponseWriter, r *http.Reques
 	comments, err := h.commentService.ListIssueComments(r.Context(), requesterID, issueID, limit, offset)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidCommentID),
 			errors.Is(err, service.ErrInvalidComment):
@@ -217,7 +216,7 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	comment, err := h.commentService.UpdateComment(r.Context(), requesterID, commentID, req)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidCommentID),
 			errors.Is(err, service.ErrInvalidComment):
@@ -251,7 +250,7 @@ func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	id, err := h.commentService.DeleteComment(r.Context(), requesterID, commentID)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidCommentID):
 			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())

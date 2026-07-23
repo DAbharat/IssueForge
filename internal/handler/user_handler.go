@@ -105,7 +105,7 @@ func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userService.GetCurrentUser(r.Context(), userID)
 	if err != nil {
 		switch {
-		case errors.Is(err, repository.ErrUserNotFound):
+		case errors.Is(err, service.ErrUserNotFound):
 			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
 		default:
 			log.Printf("me response fail: %v", err)

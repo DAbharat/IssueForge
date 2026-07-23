@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"IssueForge/internal/auth"
 	"IssueForge/internal/dto"
 	"IssueForge/internal/httpx"
 	"IssueForge/internal/middleware"
@@ -69,6 +68,8 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	project, err := h.projectService.CreateProject(r.Context(), leadID, req)
 	if err != nil {
 		switch {
+		case errors.Is(err, service.ErrForbidden):
+			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, service.ErrInvalidProjectName),
 			errors.Is(err, service.ErrInvalidDescription):
 			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -117,7 +118,7 @@ func (h *ProjectHandler) ListProjectsByWorkspace(w http.ResponseWriter, r *http.
 	projects, err := h.projectService.ListProjectsByWorkspace(r.Context(), workspaceID, userID)
 	if err != nil {
 		switch {
-		case errors.Is(err, auth.ErrForbidden):
+		case errors.Is(err, service.ErrForbidden):
 			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
 		default:
 			log.Printf("list project by workspace fail: %v", err)
