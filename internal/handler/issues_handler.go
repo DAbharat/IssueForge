@@ -19,7 +19,7 @@ import (
 type IssueService interface {
 	CreateIssue(ctx context.Context, creatorID int64, req dto.CreateIssueRequest) (dto.CreateIssueResponse, error)
 	GetIssueByID(ctx context.Context, requesterID, issueID int64) (dto.IssueResponse, error)
-	ListProjectIssues(ctx context.Context, requesterID, projectID int64) ([]dto.IssueSummary, error)
+	ListProjectIssues(ctx context.Context, requesterID, projectID int64, req dto.ListProjectIssuesRequest) ([]dto.IssueSummary, error)
 	UpdateIssueDetails(ctx context.Context, requesterID, issueID int64, req dto.UpdateIssueDetailsRequest) (dto.IssueResponse, error)
 	UpdateIssueStatus(ctx context.Context, requesterID, issueID int64, req dto.UpdateIssueStatusRequest) (dto.IssueResponse, error)
 	UpdateIssueAssignee(ctx context.Context, requesterID, issueID int64, req dto.UpdateIssueAssigneeRequest) (dto.IssueResponse, error)
@@ -136,6 +136,48 @@ func (h *IssueHandler) ListProjectIssues(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	req := dto.ListProjectIssuesRequest{
+		Limit:  20,
+		Offset: 0,
+	}
+
+	if value := r.URL.Query().Get("status"); value != "" {
+		req.Status = &value
+	}
+	if value := r.URL.Query().Get("priority"); value != "" {
+		req.Priority = &value
+	}
+	if value := r.URL.Query().Get("search"); value != "" {
+		req.Search = &value
+	}
+
+	if value := r.URL.Query().Get("assigend_to"); value != "" {
+		id, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidAssignee.Error())
+			return
+		}
+		req.AssignedTo = &id
+	}
+
+	if value := r.URL.Query().Get("limit"); value != "" {
+		limit, err := strconv.ParseInt(value, 10, 32)
+		if err != nil {
+			httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidLimit.Error())
+			return
+		}
+		req.Limit = int32(limit)
+	}
+
+	if value := r.URL.Query().Get("offset"); value != "" {
+		offset, err := strconv.ParseInt(value, 10, 32)
+		if err != nil {
+			httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidOffset.Error())
+			return
+		}
+		req.Offset = int32(offset)
+	}
+
 	vars := mux.Vars(r)
 
 	projectID, err := strconv.ParseInt(vars["projectID"], 10, 64)
@@ -144,7 +186,7 @@ func (h *IssueHandler) ListProjectIssues(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	issue, err := h.issueService.ListProjectIssues(r.Context(), requesterID, projectID)
+	issue, err := h.issueService.ListProjectIssues(r.Context(), requesterID, projectID, req)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrForbidden):

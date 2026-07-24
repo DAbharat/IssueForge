@@ -14,7 +14,7 @@ import (
 type IssueRepo interface {
 	CreateIssue(ctx context.Context, creatorID, projectID int64, assignedTo *int64, title, description, status, priority string) (sqlc.Issue, error)
 	GetIssueByID(ctx context.Context, issueID int64) (sqlc.GetIssueByIDRow, error)
-	ListProjectIssues(ctx context.Context, projectID int64) ([]sqlc.ListProjectIssuesRow, error)
+	ListProjectIssues(ctx context.Context, projectID int64, status, priority *string, assignedTo *int64, search *string, limit, offset int32) ([]sqlc.ListProjectIssuesRow, error)
 	UpdateIssueDetails(ctx context.Context, issueID int64, title, description string) (sqlc.Issue, error)
 	UpdateIssueStatus(ctx context.Context, issueID int64, status string) (sqlc.Issue, error)
 	UpdateIssueAssignee(ctx context.Context, issueID int64, assignedTo *int64) (sqlc.Issue, error)
@@ -166,16 +166,53 @@ func (s *IssueService) GetIssueByID(ctx context.Context, requesterID, issueID in
 	}, nil
 }
 
-func (s *IssueService) ListProjectIssues(ctx context.Context, requesterID, projectID int64) ([]dto.IssueSummary, error) {
+func (s *IssueService) ListProjectIssues(ctx context.Context, requesterID, projectID int64, req dto.ListProjectIssuesRequest) ([]dto.IssueSummary, error) {
 	if projectID <= 0 {
 		return nil, ErrInvalidProjectID
+	}
+
+	if req.AssignedTo != nil && *req.AssignedTo <= 0 {
+		return nil, ErrInvalidAssignee
+	}
+
+	search := strings.TrimSpace(*req.Search)
+	if search == "" {
+		req.Search = nil
+	} else {
+		if utf8.RuneCountInString(search) > 50 {
+			return nil, ErrInvalidSearchQuery
+		}
+		req.Search = &search
+	}
+
+	if req.Status != nil {
+		switch *req.Status {
+		case "TODO", "IN_PROGRESS", "DONE":
+		default:
+			return nil, ErrInvalidStatus
+		}
+	}
+
+	if req.Priority != nil {
+		switch *req.Priority {
+		case "LOW", "MEDIUM", "HIGH":
+		default:
+			return nil, ErrInvalidPriority
+		}
+	}
+
+	if req.Limit <= 0 || req.Limit > 100 {
+		return nil, ErrInvalidLimit
+	}
+	if req.Offset < 0 {
+		return nil, ErrInvalidOffset
 	}
 
 	if err := s.authz.RequireProjectMember(ctx, projectID, requesterID); err != nil {
 		return nil, err
 	}
 
-	dbIssues, err := s.repo.ListProjectIssues(ctx, projectID)
+	dbIssues, err := s.repo.ListProjectIssues(ctx, projectID, req.Status, req.Priority, req.AssignedTo, req.Search, req.Limit, req.Offset)
 	if err != nil {
 		if errors.Is(err, repository.ErrProjectNotFound) {
 			return nil, ErrProjectNotFound

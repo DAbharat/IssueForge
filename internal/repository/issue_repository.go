@@ -75,8 +75,40 @@ func (r *IssueRepository) GetIssueByID(ctx context.Context, id int64) (sqlc.GetI
 	return issue, nil
 }
 
-func (r *IssueRepository) ListProjectIssues(ctx context.Context, projectID int64) ([]sqlc.ListProjectIssuesRow, error) {
-	issues, err := r.queries.ListProjectIssues(ctx, projectID)
+func (r *IssueRepository) ListProjectIssues(ctx context.Context, projectID int64, status, priority *string, assignedTo *int64, search *string, limit, offset int32) ([]sqlc.ListProjectIssuesRow, error) {
+	var newStatus sqlc.NullIssueStatus
+	var newPriority sqlc.NullIssuePriority
+	var assignee pgtype.Int8
+	var newSearch pgtype.Text
+
+	if status != nil {
+		newStatus.IssueStatus = sqlc.IssueStatus(*status)
+		newStatus.Valid = true
+	}
+	if priority != nil {
+		newPriority.IssuePriority = sqlc.IssuePriority(*priority)
+		newPriority.Valid = true
+	}
+	if assignedTo != nil {
+		assignee.Int64 = *assignedTo
+		assignee.Valid = true
+	}
+	if search != nil {
+		newSearch.String = *search
+		newSearch.Valid = true
+	}
+
+	params := sqlc.ListProjectIssuesParams{
+		ProjectID:  projectID,
+		Status:     newStatus,
+		Priority:   newPriority,
+		AssignedTo: assignee,
+		Search:     newSearch,
+		PageLimit:  limit,
+		PageOffset: offset,
+	}
+
+	issues, err := r.queries.ListProjectIssues(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("list project issues: %w", err)
 	}

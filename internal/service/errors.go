@@ -35,4 +35,5 @@ var (
 	ErrInvalidCommentID              = errors.New("invalid comment id")
 	ErrInvalidActorID                = errors.New("invalid actor id")
 	ErrInvalidActivityType           = errors.New("invalid activity type")
+	ErrInvalidSearchQuery            = errors.New("invalid search query")
 )

@@ -29,7 +29,13 @@ FROM issues i
 INNER JOIN users u_creator ON i.created_by = u_creator.id
 LEFT JOIN users u_assignee ON i.assigned_to = u_assignee.id
 WHERE i.project_id = $1 AND i.deleted_at IS NULL
-ORDER BY i.created_at DESC;
+    AND (sqlc.narg(status)::issue_status IS NULL OR i.status = sqlc.narg(status))
+    AND (sqlc.narg(priority)::issue_priority IS NULL OR i.priority = sqlc.narg(priority))
+    AND (sqlc.narg(assigned_to)::bigint IS NULL OR i.assigned_to = sqlc.narg(assigned_to))
+    AND (sqlc.narg(search)::text IS NULL OR i.title ILIKE '%' || sqlc.narg(search) || '%')
+ORDER BY i.created_at DESC
+LIMIT sqlc.arg(page_limit)
+OFFSET sqlc.arg(page_offset);
 
 
 -- name: UpdateIssueDetails :one

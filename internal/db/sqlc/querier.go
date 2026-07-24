@@ -36,7 +36,7 @@ type Querier interface {
 	ListCreatedIssues(ctx context.Context, createdBy int64) ([]ListCreatedIssuesRow, error)
 	ListIssueActivities(ctx context.Context, arg ListIssueActivitiesParams) ([]ListIssueActivitiesRow, error)
 	ListIssueComments(ctx context.Context, arg ListIssueCommentsParams) ([]ListIssueCommentsRow, error)
-	ListProjectIssues(ctx context.Context, projectID int64) ([]ListProjectIssuesRow, error)
+	ListProjectIssues(ctx context.Context, arg ListProjectIssuesParams) ([]ListProjectIssuesRow, error)
 	ListProjectMembers(ctx context.Context, projectID int64) ([]ListProjectMembersRow, error)
 	ListProjectsByLead(ctx context.Context, leadID int64) ([]Project, error)
 	ListProjectsByWorkspace(ctx context.Context, workspaceID int64) ([]Project, error)

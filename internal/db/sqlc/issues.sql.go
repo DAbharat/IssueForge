@@ -239,8 +239,24 @@ FROM issues i
 INNER JOIN users u_creator ON i.created_by = u_creator.id
 LEFT JOIN users u_assignee ON i.assigned_to = u_assignee.id
 WHERE i.project_id = $1 AND i.deleted_at IS NULL
+    AND ($2::issue_status IS NULL OR i.status = $2)
+    AND ($3::issue_priority IS NULL OR i.priority = $3)
+    AND ($4::bigint IS NULL OR i.assigned_to = $4)
+    AND ($5::text IS NULL OR i.title ILIKE '%' || $5 || '%')
 ORDER BY i.created_at DESC
+LIMIT $7
+OFFSET $6
 `
+
+type ListProjectIssuesParams struct {
+	ProjectID  int64             `json:"project_id"`
+	Status     NullIssueStatus   `json:"status"`
+	Priority   NullIssuePriority `json:"priority"`
+	AssignedTo pgtype.Int8       `json:"assigned_to"`
+	Search     pgtype.Text       `json:"search"`
+	PageOffset int32             `json:"page_offset"`
+	PageLimit  int32             `json:"page_limit"`
+}
 
 type ListProjectIssuesRow struct {
 	ID           int64              `json:"id"`
@@ -256,8 +272,16 @@ type ListProjectIssuesRow struct {
 	AssigneeName pgtype.Text        `json:"assignee_name"`
 }
 
-func (q *Queries) ListProjectIssues(ctx context.Context, projectID int64) ([]ListProjectIssuesRow, error) {
-	rows, err := q.db.Query(ctx, listProjectIssues, projectID)
+func (q *Queries) ListProjectIssues(ctx context.Context, arg ListProjectIssuesParams) ([]ListProjectIssuesRow, error) {
+	rows, err := q.db.Query(ctx, listProjectIssues,
+		arg.ProjectID,
+		arg.Status,
+		arg.Priority,
+		arg.AssignedTo,
+		arg.Search,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

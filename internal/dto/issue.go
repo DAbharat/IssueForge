@@ -52,6 +52,15 @@ type IssueSummary struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+type ListProjectIssuesRequest struct {
+	Status     *string
+	Priority   *string
+	AssignedTo *int64
+	Search     *string
+	Limit      int32
+	Offset     int32
+}
+
 type UpdateIssueDetailsRequest struct {
 	Title       string  `json:"title"`
 	Description *string `json:"description,omitempty"`
