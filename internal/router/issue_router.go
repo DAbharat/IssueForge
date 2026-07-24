@@ -48,4 +48,8 @@ func registerIssueRoutes(r *mux.Router, issueHandler *handler.IssueHandler, auth
 	r.Handle("/api/issues/{issueID}",
 		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.DeleteIssue)),
 	).Methods("DELETE")
+
+	r.Handle("/api/issues/{issueID}/restore",
+		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.RestoreDeletedIssue)),
+	).Methods("PATCH")
 }

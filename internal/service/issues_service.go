@@ -22,6 +22,7 @@ type IssueRepo interface {
 	ListAssignedIssues(ctx context.Context, assignedTo int64) ([]sqlc.ListAssignedIssuesRow, error)
 	ListCreatedIssues(ctx context.Context, createdBy int64) ([]sqlc.ListCreatedIssuesRow, error)
 	DeleteIssue(ctx context.Context, issueID int64) (int64, error)
+	RestoreDeletedIssue(ctx context.Context, issueID int64) (int64, error)
 }
 
 type ActivityService interface {
@@ -598,4 +599,39 @@ func (s *IssueService) DeleteIssue(ctx context.Context, requesterID, issueID int
 		return 0, err
 	}
 	return id, nil
+}
+
+func (s *IssueService) RestoreDeletedIssue(ctx context.Context, requesterID, issueID int64) (int64, error) {
+	if issueID <= 0 {
+		return 0, ErrInvalidIssueID
+	}
+
+	dbIssue, err := s.repo.GetIssueByID(ctx, issueID)
+	if err != nil {
+		if errors.Is(err, repository.ErrIssueNotFound) {
+			return 0, ErrIssueNotFound
+		}
+		return 0, fmt.Errorf("get issue by id(restore): %w", err)
+	}
+
+	isCreator := requesterID == dbIssue.CreatedBy
+	isLead := s.authz.RequireProjectLead(ctx, dbIssue.ProjectID, requesterID) == nil
+
+	if !isCreator && !isLead {
+		return 0, ErrForbidden
+	}
+
+	issue, err := s.repo.RestoreDeletedIssue(ctx, dbIssue.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrIssueNotFound) {
+			return 0, ErrIssueNotFound
+		}
+		return 0, fmt.Errorf("restore deleted issue: %w", err)
+	}
+
+	_, err = s.activityRepo.CreateActivity(ctx, dbIssue.ID, requesterID, "ISSUE_RESTORED", nil, nil, nil)
+	if err != nil {
+		return 0, err
+	}
+	return issue, nil
 }

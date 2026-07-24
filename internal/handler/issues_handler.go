@@ -27,6 +27,7 @@ type IssueService interface {
 	ListAssignedIssues(ctx context.Context, requesterID, assignedTo int64) ([]dto.UserIssueSummary, error)
 	ListCreatedIssues(ctx context.Context, requesterID, createdBy int64) ([]dto.UserIssueSummary, error)
 	DeleteIssue(ctx context.Context, requesterID, issueID int64) (int64, error)
+	RestoreDeletedIssue(ctx context.Context, requesterID, issueID int64) (int64, error)
 }
 
 type IssueHandler struct {
@@ -447,4 +448,37 @@ func (h *IssueHandler) DeleteIssue(w http.ResponseWriter, r *http.Request) {
 	httpx.RespondWithJSON(w, http.StatusOK, map[string]int64{
 		"deleted_issue_id": issue,
 	})
+}
+
+func (h *IssueHandler) RestoreDeletedIssue(w http.ResponseWriter, r *http.Request) {
+	requesterID, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	vars := mux.Vars(r)
+
+	issueID, err := strconv.ParseInt(vars["issueID"], 10, 64)
+	if err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidIssueID.Error())
+		return
+	}
+
+	issue, err := h.issueService.RestoreDeletedIssue(r.Context(), requesterID, issueID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
+		case errors.Is(err, service.ErrInvalidIssueID):
+			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
+		case errors.Is(err, service.ErrIssueNotFound):
+			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
+		default:
+			log.Printf("restore deleted issue fail: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	httpx.RespondWithJSON(w, http.StatusOK, issue)
 }
