@@ -9,6 +9,7 @@ import (
 	"IssueForge/internal/repository"
 	"IssueForge/internal/router"
 	"IssueForge/internal/service"
+	"IssueForge/internal/storage"
 	"context"
 	"errors"
 	"log"
@@ -18,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/joho/godotenv"
 )
 
@@ -42,6 +44,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("load postgres: %v", err)
 	}
+
+	cld, err := cloudinary.NewFromParams(
+		cfg.CloudinaryCloudName,
+		cfg.CloudinaryAPIKey,
+		cfg.CloudinaryAPISecret,
+	)
+	if err != nil {
+		log.Fatalf("initialize cloudinary: %v", err)
+	}
+
+	_ = storage.NewCloudinaryStorage(cld)
 
 	queries := sqlc.New(pool)
 
