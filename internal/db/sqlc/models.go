@@ -225,6 +225,20 @@ type IssueActivity struct {
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 }
 
+type IssueAttachment struct {
+	ID           int64              `json:"id"`
+	IssueID      int64              `json:"issue_id"`
+	CommentID    pgtype.Int8        `json:"comment_id"`
+	UploadedBy   int64              `json:"uploaded_by"`
+	OriginalName string             `json:"original_name"`
+	StorageKey   string             `json:"storage_key"`
+	ResourceType string             `json:"resource_type"`
+	MimeType     string             `json:"mime_type"`
+	FileSize     int64              `json:"file_size"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
+}
+
 type Project struct {
 	ID          int64              `json:"id"`
 	WorkspaceID int64              `json:"workspace_id"`
