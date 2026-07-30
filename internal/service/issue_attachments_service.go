@@ -274,7 +274,7 @@ func (s *IssueAttachmentService) ListCommentAttachments(ctx context.Context, req
 	return attachments, nil
 }
 
-func (s *IssueAttachmentService) SoftDeleteAttachment(ctx context.Context, requesterID, id int64) (int64, error) {
+func (s *IssueAttachmentService) SoftDeleteAttachments(ctx context.Context, requesterID, id int64) (int64, error) {
 	dbAttachment, err := s.repo.GetAttachmentByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrAttachmentNotFound) {

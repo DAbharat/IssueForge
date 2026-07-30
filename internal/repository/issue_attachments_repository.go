@@ -92,7 +92,7 @@ func (r *IssueAttachmentsRepository) ListIssueAttachments(ctx context.Context, i
 	return attachments, nil
 }
 
-func (r *IssueAttachmentsRepository) SoftDeleteAttachment(ctx context.Context, id int64) (sqlc.SoftDeleteAttachmentRow, error) {
+func (r *IssueAttachmentsRepository) SoftDeleteAttachments(ctx context.Context, id int64) (sqlc.SoftDeleteAttachmentRow, error) {
 	attachment, err := r.queries.SoftDeleteAttachment(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

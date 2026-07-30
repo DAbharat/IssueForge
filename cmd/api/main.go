@@ -54,8 +54,6 @@ func main() {
 		log.Fatalf("initialize cloudinary: %v", err)
 	}
 
-	_ = storage.NewCloudinaryStorage(cld)
-
 	queries := sqlc.New(pool)
 
 	userRepo := repository.NewUserRepository(queries)
@@ -96,7 +94,13 @@ func main() {
 
 	issueActivityHandler := handler.NewIssueActivityHandler(issueActivityService)
 
-	r := router.New(userHandler, projectHandler, projectMemberHandler, workspaceHandler, workspaceMemberHandler, issueHandler, commentHandler, issueActivityHandler, authMiddleware)
+	cloudStorage := storage.NewCloudinaryStorage(cld)
+
+	issueAttachmentsRepo := repository.NewIssueAttachmentsRepository(queries)
+	issueAttachmentsService := service.NewIssueAttachmentsService(issueAttachmentsRepo, issueRepo, commentRepo, cloudStorage, authzService)
+	issueAttachmentsHandler := handler.NewIssueAttachmentsHandler(issueAttachmentsService)
+
+	r := router.New(userHandler, projectHandler, projectMemberHandler, workspaceHandler, workspaceMemberHandler, issueHandler, commentHandler, issueActivityHandler, issueAttachmentsHandler, authMiddleware)
 
 	server := &http.Server{
 		Addr:              serverAddr,
