@@ -43,4 +43,5 @@ var (
 	ErrCommentDoesNotBelongToIssue   = errors.New("comment does not belong to this issue")
 	ErrAttachmentNotFound            = errors.New("attachment not found")
 	ErrInvalidAttachmentID           = errors.New("invalid attachment id")
+	ErrInvalidDueDate                = errors.New("invalid due date")
 )

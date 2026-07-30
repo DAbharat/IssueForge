@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -193,6 +194,28 @@ func (r *IssueRepository) UpdateIssuePriority(ctx context.Context, id int64, pri
 			return sqlc.Issue{}, ErrIssueNotFound
 		}
 		return sqlc.Issue{}, fmt.Errorf("update issue priority: %w", err)
+	}
+	return issue, nil
+}
+
+func (r *IssueRepository) UpdateIssueDueDate(ctx context.Context, issueID int64, dueDate *time.Time) (sqlc.Issue, error) {
+	var dbDueDate pgtype.Timestamptz
+	if dueDate != nil {
+		dbDueDate.Time = *dueDate
+		dbDueDate.Valid = true
+	}
+
+	params := sqlc.UpdateIssueDueDateParams{
+		ID:      issueID,
+		DueDate: dbDueDate,
+	}
+
+	issue, err := r.queries.UpdateIssueDueDate(ctx, params)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.Issue{}, ErrIssueNotFound
+		}
+		return sqlc.Issue{}, fmt.Errorf("update due date: %w", err)
 	}
 	return issue, nil
 }

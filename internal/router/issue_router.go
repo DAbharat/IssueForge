@@ -45,6 +45,10 @@ func registerIssueRoutes(r *mux.Router, issueHandler *handler.IssueHandler, auth
 		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.ListCreatedIssues)),
 	).Methods("GET")
 
+	r.Handle("/api/issues/{issueID}/due-date",
+		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.UpdateIssueDueDate)),
+	).Methods("PATCH")
+
 	r.Handle("/api/issues/{issueID}",
 		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.DeleteIssue)),
 	).Methods("DELETE")

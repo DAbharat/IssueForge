@@ -212,6 +212,7 @@ type Issue struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+	DueDate     pgtype.Timestamptz `json:"due_date"`
 }
 
 type IssueActivity struct {

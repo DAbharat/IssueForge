@@ -12,44 +12,47 @@ type CreateIssueRequest struct {
 }
 
 type CreateIssueResponse struct {
-	ID          int64     `json:"id"`
-	ProjectID   int64     `json:"project_id"`
-	CreatedBy   int64     `json:"created_by"`
-	AssignedTo  *int64    `json:"assigned_to,omitempty"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Status      string    `json:"status"`
-	Priority    string    `json:"priority"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          int64      `json:"id"`
+	ProjectID   int64      `json:"project_id"`
+	CreatedBy   int64      `json:"created_by"`
+	AssignedTo  *int64     `json:"assigned_to,omitempty"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	Status      string     `json:"status"`
+	Priority    string     `json:"priority"`
+	DueDate     *time.Time `json:"due_date"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 type IssueResponse struct {
-	ID           int64     `json:"id"`
-	ProjectID    int64     `json:"project_id"`
-	CreatedBy    int64     `json:"created_by"`
-	CreatorName  string    `json:"creator_name"`
-	AssignedTo   *int64    `json:"assigned_to,omitempty"`
-	AssigneeName *string   `json:"assignee_name,omitempty"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	Status       string    `json:"status"`
-	Priority     string    `json:"priority"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID           int64      `json:"id"`
+	ProjectID    int64      `json:"project_id"`
+	CreatedBy    int64      `json:"created_by"`
+	CreatorName  string     `json:"creator_name"`
+	AssignedTo   *int64     `json:"assigned_to,omitempty"`
+	AssigneeName *string    `json:"assignee_name,omitempty"`
+	Title        string     `json:"title"`
+	Description  string     `json:"description"`
+	Status       string     `json:"status"`
+	Priority     string     `json:"priority"`
+	DueDate      *time.Time `json:"due_date"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
 }
 
 type IssueSummary struct {
-	ID           int64     `json:"id"`
-	ProjectID    int64     `json:"project_id"`
-	CreatedBy    int64     `json:"created_by"`
-	CreatorName  string    `json:"creator_name"`
-	AssignedTo   *int64    `json:"assigned_to,omitempty"`
-	AssigneeName *string   `json:"assignee_name"`
-	Title        string    `json:"title"`
-	Status       string    `json:"status"`
-	Priority     string    `json:"priority"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID           int64      `json:"id"`
+	ProjectID    int64      `json:"project_id"`
+	CreatedBy    int64      `json:"created_by"`
+	CreatorName  string     `json:"creator_name"`
+	AssignedTo   *int64     `json:"assigned_to,omitempty"`
+	AssigneeName *string    `json:"assignee_name"`
+	Title        string     `json:"title"`
+	Status       string     `json:"status"`
+	Priority     string     `json:"priority"`
+	CreatedAt    time.Time  `json:"created_at"`
+	DueDate      *time.Time `json:"due_date"`
 }
 
 type ListProjectIssuesRequest struct {
@@ -78,12 +81,17 @@ type UpdateIssuePriority struct {
 	Priority string `json:"priority"`
 }
 
+type UpdateIssueDueDate struct {
+	DueDate *time.Time `json:"due_date"`
+}
+
 type UserIssueSummary struct {
-	ID          int64     `json:"id"`
-	ProjectID   int64     `json:"project_id"`
-	ProjectName string    `json:"project_name"`
-	Title       string    `json:"title"`
-	Status      string    `json:"status"`
-	Priority    string    `json:"priority"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          int64      `json:"id"`
+	ProjectID   int64      `json:"project_id"`
+	ProjectName string     `json:"project_name"`
+	Title       string     `json:"title"`
+	Status      string     `json:"status"`
+	Priority    string     `json:"priority"`
+	CreatedAt   time.Time  `json:"created_at"`
+	DueDate     *time.Time `json:"due_date"`
 }

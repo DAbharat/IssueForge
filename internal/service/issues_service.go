@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -19,6 +20,7 @@ type IssueRepo interface {
 	UpdateIssueStatus(ctx context.Context, issueID int64, status string) (sqlc.Issue, error)
 	UpdateIssueAssignee(ctx context.Context, issueID int64, assignedTo *int64) (sqlc.Issue, error)
 	UpdateIssuePriority(ctx context.Context, issueID int64, priority string) (sqlc.Issue, error)
+	UpdateIssueDueDate(ctx context.Context, issueID int64, dueDate *time.Time) (sqlc.Issue, error)
 	ListAssignedIssues(ctx context.Context, assignedTo int64) ([]sqlc.ListAssignedIssuesRow, error)
 	ListCreatedIssues(ctx context.Context, createdBy int64) ([]sqlc.ListCreatedIssuesRow, error)
 	DeleteIssue(ctx context.Context, issueID int64) (int64, error)
@@ -102,12 +104,16 @@ func (s *IssueService) CreateIssue(ctx context.Context, creatorID int64, req dto
 
 	_, err = s.activityRepo.CreateActivity(ctx, issue.ID, creatorID, "ISSUE_CREATED", nil, nil, nil)
 	if err != nil {
-		return dto.CreateIssueResponse{}, err
+		return dto.CreateIssueResponse{}, fmt.Errorf("create activity: %w", err)
 	}
 
 	var assignedTo *int64
 	if issue.AssignedTo.Valid {
 		assignedTo = &issue.AssignedTo.Int64
+	}
+	var dueDate *time.Time
+	if issue.DueDate.Valid {
+		dueDate = &issue.DueDate.Time
 	}
 
 	return dto.CreateIssueResponse{
@@ -119,6 +125,7 @@ func (s *IssueService) CreateIssue(ctx context.Context, creatorID int64, req dto
 		Description: issueDescription,
 		Status:      string(issue.Status),
 		Priority:    string(issue.Priority),
+		DueDate:     dueDate,
 		CreatedAt:   issue.CreatedAt.Time,
 		UpdatedAt:   issue.UpdatedAt.Time,
 	}, nil
@@ -150,6 +157,11 @@ func (s *IssueService) GetIssueByID(ctx context.Context, requesterID, issueID in
 	if err := s.authz.RequireProjectMember(ctx, issue.ProjectID, requesterID); err != nil {
 		return dto.IssueResponse{}, fmt.Errorf("get issue by id: %w", err)
 	}
+
+	var dueDate *time.Time
+	if issue.DueDate.Valid {
+		dueDate = &issue.DueDate.Time
+	}
 	return dto.IssueResponse{
 		ID:           issueID,
 		ProjectID:    issue.ProjectID,
@@ -161,6 +173,7 @@ func (s *IssueService) GetIssueByID(ctx context.Context, requesterID, issueID in
 		Description:  issue.Description,
 		Status:       string(issue.Status),
 		Priority:     string(issue.Priority),
+		DueDate:      dueDate,
 		CreatedAt:    issue.CreatedAt.Time,
 		UpdatedAt:    issue.UpdatedAt.Time,
 	}, nil
@@ -233,6 +246,11 @@ func (s *IssueService) ListProjectIssues(ctx context.Context, requesterID, proje
 			assigneeName = &i.AssigneeName.String
 		}
 
+		var dueDate *time.Time
+		if i.DueDate.Valid {
+			dueDate = &i.DueDate.Time
+		}
+
 		issues = append(issues, dto.IssueSummary{
 			ID:           i.ID,
 			ProjectID:    i.ProjectID,
@@ -244,6 +262,7 @@ func (s *IssueService) ListProjectIssues(ctx context.Context, requesterID, proje
 			Status:       string(i.Status),
 			Priority:     string(i.Priority),
 			CreatedAt:    i.CreatedAt.Time,
+			DueDate:      dueDate,
 		})
 	}
 	return issues, nil
@@ -301,14 +320,14 @@ func (s *IssueService) UpdateIssueDetails(ctx context.Context, requesterID, issu
 	if oldTitle != newTitle {
 		_, err = s.activityRepo.CreateActivity(ctx, issues.ID, requesterID, "ISSUE_DETAILS_UPDATED", &titleField, &oldTitle, &newTitle)
 		if err != nil {
-			return dto.IssueResponse{}, err
+			return dto.IssueResponse{}, fmt.Errorf("create activity: %w", err)
 		}
 	}
 
 	if oldDesc != newDesc {
 		_, err = s.activityRepo.CreateActivity(ctx, issues.ID, requesterID, "ISSUE_DETAILS_UPDATED", &descField, &oldDesc, &newDesc)
 		if err != nil {
-			return dto.IssueResponse{}, err
+			return dto.IssueResponse{}, fmt.Errorf("create activity: %w", err)
 		}
 	}
 
@@ -320,6 +339,10 @@ func (s *IssueService) UpdateIssueDetails(ctx context.Context, requesterID, issu
 	if dbIssue.AssigneeName.Valid {
 		assigneeName = &dbIssue.AssigneeName.String
 	}
+	var dueDate *time.Time
+	if issues.DueDate.Valid {
+		dueDate = &issues.DueDate.Time
+	}
 	return dto.IssueResponse{
 		ID:           issues.ID,
 		ProjectID:    issues.ProjectID,
@@ -330,6 +353,7 @@ func (s *IssueService) UpdateIssueDetails(ctx context.Context, requesterID, issu
 		Description:  issues.Description,
 		Status:       string(issues.Status),
 		Priority:     string(issues.Priority),
+		DueDate:      dueDate,
 		CreatedAt:    issues.CreatedAt.Time,
 		UpdatedAt:    issues.UpdatedAt.Time,
 	}, nil
@@ -370,7 +394,7 @@ func (s *IssueService) UpdateIssueStatus(ctx context.Context, requesterID, issue
 	if oldStatus != newStatus {
 		_, err = s.activityRepo.CreateActivity(ctx, issue.ID, requesterID, "ISSUE_STATUS_CHANGED", &field, &oldStatus, &newStatus)
 		if err != nil {
-			return dto.IssueResponse{}, err
+			return dto.IssueResponse{}, fmt.Errorf("create activity: %w", err)
 		}
 	}
 
@@ -382,6 +406,10 @@ func (s *IssueService) UpdateIssueStatus(ctx context.Context, requesterID, issue
 	if dbIssue.AssigneeName.Valid {
 		assigneeName = &dbIssue.AssigneeName.String
 	}
+	var dueDate *time.Time
+	if issue.DueDate.Valid {
+		dueDate = &issue.DueDate.Time
+	}
 	return dto.IssueResponse{
 		ID:           issue.ID,
 		ProjectID:    issue.ProjectID,
@@ -392,6 +420,7 @@ func (s *IssueService) UpdateIssueStatus(ctx context.Context, requesterID, issue
 		Description:  issue.Description,
 		Status:       string(issue.Status),
 		Priority:     string(issue.Priority),
+		DueDate:      dueDate,
 		CreatedAt:    issue.CreatedAt.Time,
 		UpdatedAt:    issue.UpdatedAt.Time,
 	}, nil
@@ -458,7 +487,7 @@ func (s *IssueService) UpdateIssueAssignee(ctx context.Context, requesterID, iss
 	if !strPtrEqual(oldAssignee, newAssignee) {
 		_, err = s.activityRepo.CreateActivity(ctx, issue.ID, requesterID, "ISSUE_ASSIGNEE_CHANGED", &field, oldAssignee, newAssignee)
 		if err != nil {
-			return dto.IssueResponse{}, err
+			return dto.IssueResponse{}, fmt.Errorf("create activity: %w", err)
 		}
 	}
 
@@ -470,6 +499,10 @@ func (s *IssueService) UpdateIssueAssignee(ctx context.Context, requesterID, iss
 	if updatedIssueWithNames.AssigneeName.Valid {
 		assigneeName = &updatedIssueWithNames.AssigneeName.String
 	}
+	var dueDate *time.Time
+	if issue.DueDate.Valid {
+		dueDate = &issue.DueDate.Time
+	}
 	return dto.IssueResponse{
 		ID:           issue.ID,
 		ProjectID:    issue.ProjectID,
@@ -480,6 +513,7 @@ func (s *IssueService) UpdateIssueAssignee(ctx context.Context, requesterID, iss
 		Description:  issue.Description,
 		Status:       string(issue.Status),
 		Priority:     string(issue.Priority),
+		DueDate:      dueDate,
 		CreatedAt:    issue.CreatedAt.Time,
 		UpdatedAt:    issue.UpdatedAt.Time,
 	}, nil
@@ -523,7 +557,7 @@ func (s *IssueService) UpdateIssuePriority(ctx context.Context, requesterID, iss
 	if oldPriority != newPriority {
 		_, err = s.activityRepo.CreateActivity(ctx, issue.ID, requesterID, "ISSUE_PRIORITY_CHANGED", &field, &oldPriority, &newPriority)
 		if err != nil {
-			return dto.IssueResponse{}, err
+			return dto.IssueResponse{}, fmt.Errorf("create activity: %w", err)
 		}
 	}
 
@@ -535,6 +569,92 @@ func (s *IssueService) UpdateIssuePriority(ctx context.Context, requesterID, iss
 	if dbIssue.AssigneeName.Valid {
 		assigneeName = &dbIssue.AssigneeName.String
 	}
+	var dueDate *time.Time
+	if issue.DueDate.Valid {
+		dueDate = &issue.DueDate.Time
+	}
+	return dto.IssueResponse{
+		ID:           issue.ID,
+		ProjectID:    issue.ProjectID,
+		CreatedBy:    issue.CreatedBy,
+		AssignedTo:   assignedTo,
+		AssigneeName: assigneeName,
+		Title:        issue.Title,
+		Description:  issue.Description,
+		Status:       string(issue.Status),
+		Priority:     string(issue.Priority),
+		DueDate:      dueDate,
+		CreatedAt:    issue.CreatedAt.Time,
+		UpdatedAt:    issue.UpdatedAt.Time,
+	}, nil
+}
+
+func (s *IssueService) UpdateIssueDueDate(ctx context.Context, requesterID, issueID int64, req dto.UpdateIssueDueDate) (dto.IssueResponse, error) {
+	if issueID <= 0 {
+		return dto.IssueResponse{}, ErrInvalidIssueID
+	}
+
+	if req.DueDate != nil {
+		if req.DueDate.Before(time.Now().UTC()) {
+			return dto.IssueResponse{}, ErrInvalidDueDate
+		}
+	}
+
+	dbIssue, err := s.repo.GetIssueByID(ctx, issueID)
+	if err != nil {
+		if errors.Is(err, repository.ErrIssueNotFound) {
+			return dto.IssueResponse{}, ErrIssueNotFound
+		}
+		return dto.IssueResponse{}, fmt.Errorf("get issue by id: %w", err)
+	}
+
+	if err := s.authz.RequireProjectLead(ctx, dbIssue.ProjectID, requesterID); err != nil {
+		return dto.IssueResponse{}, err
+	}
+
+	var oldDueDate *string
+	if dbIssue.DueDate.Valid {
+		s := dbIssue.DueDate.Time.Format(time.RFC3339)
+		oldDueDate = &s
+	}
+
+	issue, err := s.repo.UpdateIssueDueDate(ctx, issueID, req.DueDate)
+	if err != nil {
+		if errors.Is(err, repository.ErrIssueNotFound) {
+			return dto.IssueResponse{}, ErrIssueNotFound
+		}
+		return dto.IssueResponse{}, fmt.Errorf("update due date: %w", err)
+	}
+
+	var newDueDate *string
+	if issue.DueDate.Valid {
+		s := issue.DueDate.Time.Format(time.RFC3339)
+		newDueDate = &s
+	}
+
+	field := "due date"
+
+	if !strPtrEqual(oldDueDate, newDueDate) {
+		_, err := s.activityRepo.CreateActivity(ctx, issue.ID, requesterID, "DUE_DATE_CHANGED", &field, oldDueDate, newDueDate)
+		if err != nil {
+			return dto.IssueResponse{}, fmt.Errorf("create activity: %w", err)
+		}
+	}
+
+	var assignedTo *int64
+	if issue.AssignedTo.Valid {
+		assignedTo = &issue.AssignedTo.Int64
+	}
+	var assigneeName *string
+	if dbIssue.AssigneeName.Valid {
+		assigneeName = &dbIssue.AssigneeName.String
+	}
+
+	var dueDate *time.Time
+	if issue.DueDate.Valid {
+		dueDate = &issue.DueDate.Time
+	}
+
 	return dto.IssueResponse{
 		ID:           issue.ID,
 		ProjectID:    issue.ProjectID,
@@ -546,7 +666,7 @@ func (s *IssueService) UpdateIssuePriority(ctx context.Context, requesterID, iss
 		Status:       string(issue.Status),
 		Priority:     string(issue.Priority),
 		CreatedAt:    issue.CreatedAt.Time,
-		UpdatedAt:    issue.UpdatedAt.Time,
+		DueDate:      dueDate,
 	}, nil
 }
 
@@ -567,6 +687,10 @@ func (s *IssueService) ListAssignedIssues(ctx context.Context, requesterID, assi
 	issues := make([]dto.UserIssueSummary, 0, len(dbIssues))
 
 	for _, i := range dbIssues {
+		var dueDate *time.Time
+		if i.DueDate.Valid {
+			dueDate = &i.DueDate.Time
+		}
 		issues = append(issues, dto.UserIssueSummary{
 			ID:          i.ID,
 			ProjectID:   i.ProjectID,
@@ -575,6 +699,7 @@ func (s *IssueService) ListAssignedIssues(ctx context.Context, requesterID, assi
 			Status:      string(i.Status),
 			Priority:    string(i.Priority),
 			CreatedAt:   i.CreatedAt.Time,
+			DueDate:     dueDate,
 		})
 	}
 	return issues, nil
@@ -596,6 +721,10 @@ func (s *IssueService) ListCreatedIssues(ctx context.Context, requesterID, creat
 
 	issues := make([]dto.UserIssueSummary, 0, len(dbIssues))
 	for _, i := range dbIssues {
+		var dueDate *time.Time
+		if i.DueDate.Valid {
+			dueDate = &i.DueDate.Time
+		}
 		issues = append(issues, dto.UserIssueSummary{
 			ID:          i.ID,
 			ProjectID:   i.ProjectID,
@@ -604,6 +733,7 @@ func (s *IssueService) ListCreatedIssues(ctx context.Context, requesterID, creat
 			Status:      string(i.Status),
 			Priority:    string(i.Priority),
 			CreatedAt:   i.CreatedAt.Time,
+			DueDate:     dueDate,
 		})
 	}
 	return issues, nil
@@ -633,7 +763,7 @@ func (s *IssueService) DeleteIssue(ctx context.Context, requesterID, issueID int
 
 	_, err = s.activityRepo.CreateActivity(ctx, dbIssue.ID, requesterID, "ISSUE_DELETED", nil, nil, nil)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("create activity: %w", err)
 	}
 	return id, nil
 }
@@ -668,7 +798,7 @@ func (s *IssueService) RestoreDeletedIssue(ctx context.Context, requesterID, iss
 
 	_, err = s.activityRepo.CreateActivity(ctx, dbIssue.ID, requesterID, "ISSUE_RESTORED", nil, nil, nil)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("create activity: %w", err)
 	}
 	return issue, nil
 }

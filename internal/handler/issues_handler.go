@@ -24,6 +24,7 @@ type IssueService interface {
 	UpdateIssueStatus(ctx context.Context, requesterID, issueID int64, req dto.UpdateIssueStatusRequest) (dto.IssueResponse, error)
 	UpdateIssueAssignee(ctx context.Context, requesterID, issueID int64, req dto.UpdateIssueAssigneeRequest) (dto.IssueResponse, error)
 	UpdateIssuePriority(ctx context.Context, requesterID, issueID int64, req dto.UpdateIssuePriority) (dto.IssueResponse, error)
+	UpdateIssueDueDate(ctx context.Context, requesterID, issueID int64, req dto.UpdateIssueDueDate) (dto.IssueResponse, error)
 	ListAssignedIssues(ctx context.Context, requesterID, assignedTo int64) ([]dto.UserIssueSummary, error)
 	ListCreatedIssues(ctx context.Context, requesterID, createdBy int64) ([]dto.UserIssueSummary, error)
 	DeleteIssue(ctx context.Context, requesterID, issueID int64) (int64, error)
@@ -401,6 +402,56 @@ func (h *IssueHandler) UpdateIssuePriority(w http.ResponseWriter, r *http.Reques
 		default:
 			log.Printf("update issue priority fail: %v", err)
 			httpx.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	httpx.RespondWithJSON(w, http.StatusOK, issue)
+}
+
+func (h *IssueHandler) UpdateIssueDueDate(w http.ResponseWriter, r *http.Request) {
+	requesterID, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+
+	var req dto.UpdateIssueDueDate
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, "invalid or oversized request body")
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		httpx.RespondWithError(w, http.StatusBadRequest, "request body must contain only a single json object")
+		return
+	}
+
+	vars := mux.Vars(r)
+
+	issueID, err := strconv.ParseInt(vars["issueID"], 10, 64)
+	if err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidIssueID.Error())
+		return
+	}
+
+	issue, err := h.issueService.UpdateIssueDueDate(r.Context(), requesterID, issueID, req)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
+		case errors.Is(err, service.ErrInvalidIssueID):
+			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
+		case errors.Is(err, service.ErrIssueNotFound):
+			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
+		case errors.Is(err, service.ErrInvalidDueDate):
+			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
+		default:
+			log.Printf("update due date fail: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		}
 		return
 	}
