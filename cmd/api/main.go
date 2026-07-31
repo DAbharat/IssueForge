@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/cloudinary/cloudinary-go/v2"
+	"github.com/gorilla/handlers"
 	"github.com/joho/godotenv"
 )
 
@@ -102,9 +103,16 @@ func main() {
 
 	r := router.New(userHandler, projectHandler, projectMemberHandler, workspaceHandler, workspaceMemberHandler, issueHandler, commentHandler, issueActivityHandler, issueAttachmentsHandler, authMiddleware)
 
+	corsHandler := handlers.CORS(
+		handlers.AllowedOrigins([]string{"http://localhost:3000"}),
+		handlers.AllowedMethods([]string{"POST", "GET", "PATCH", "PUT", "DELETE", "OPTIONS"}),
+		handlers.AllowedHeaders([]string{"Content-Type", "Authorization"}),
+		handlers.AllowCredentials(),
+	)
+
 	server := &http.Server{
 		Addr:              serverAddr,
-		Handler:           r,
+		Handler:           corsHandler(r),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
