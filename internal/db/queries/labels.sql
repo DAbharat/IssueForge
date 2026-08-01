@@ -61,10 +61,11 @@ INSERT INTO issue_labels(
 ON CONFLICT (issue_id, label_id) DO NOTHING;
 
 
--- name: RemoveLabelFromIssue :exec
+-- name: RemoveLabelFromIssue :one
 DELETE FROM issue_labels
 WHERE issue_id = $1
-AND label_id = $2;
+AND label_id = $2
+RETURNING issue_id;
 
 
 -- name: ListIssueLabels :many

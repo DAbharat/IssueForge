@@ -218,10 +218,11 @@ func (q *Queries) ListProjectLabels(ctx context.Context, projectID int64) ([]Lab
 	return items, nil
 }
 
-const removeLabelFromIssue = `-- name: RemoveLabelFromIssue :exec
+const removeLabelFromIssue = `-- name: RemoveLabelFromIssue :one
 DELETE FROM issue_labels
 WHERE issue_id = $1
 AND label_id = $2
+RETURNING issue_id
 `
 
 type RemoveLabelFromIssueParams struct {
@@ -229,9 +230,11 @@ type RemoveLabelFromIssueParams struct {
 	LabelID int64 `json:"label_id"`
 }
 
-func (q *Queries) RemoveLabelFromIssue(ctx context.Context, arg RemoveLabelFromIssueParams) error {
-	_, err := q.db.Exec(ctx, removeLabelFromIssue, arg.IssueID, arg.LabelID)
-	return err
+func (q *Queries) RemoveLabelFromIssue(ctx context.Context, arg RemoveLabelFromIssueParams) (int64, error) {
+	row := q.db.QueryRow(ctx, removeLabelFromIssue, arg.IssueID, arg.LabelID)
+	var issue_id int64
+	err := row.Scan(&issue_id)
+	return issue_id, err
 }
 
 const updateLabel = `-- name: UpdateLabel :one

@@ -23,4 +23,5 @@ var (
 	ErrAttachmentNotFound            = errors.New("attachment not found")
 	ErrLabelAlreadyExists            = errors.New("label already exists")
 	ErrLabelNotFound                 = errors.New("label not found")
+	ErrLabelNotAttached              = errors.New("label not attached")
 )

@@ -153,17 +153,20 @@ func (r *LabelsRepository) AttachLabelsToIssue(ctx context.Context, issueID int6
 	return nil
 }
 
-func (r *LabelsRepository) RemoveLabelFromIssue(ctx context.Context, issueID, labelID int64) error {
+func (r *LabelsRepository) RemoveLabelFromIssue(ctx context.Context, issueID, labelID int64) (int64, error) {
 	params := sqlc.RemoveLabelFromIssueParams{
 		IssueID: issueID,
 		LabelID: labelID,
 	}
 
-	err := r.queries.RemoveLabelFromIssue(ctx, params)
+	id, err := r.queries.RemoveLabelFromIssue(ctx, params)
 	if err != nil {
-		return fmt.Errorf("remove label from issue: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, ErrLabelNotAttached
+		}
+		return 0, fmt.Errorf("remove label from issue: %w", err)
 	}
-	return nil
+	return id, nil
 }
 
 func (r *LabelsRepository) ListIssueLabels(ctx context.Context, issueID int64) ([]sqlc.Label, error) {
