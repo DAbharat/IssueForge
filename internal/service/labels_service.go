@@ -228,12 +228,12 @@ func (s *LabelsService) DeleteLabel(ctx context.Context, requesterID, labelID in
 	}, nil
 }
 
-func (s *LabelsService) AttachLabelsToIssue(ctx context.Context, requesterID, issueID int64, labelIDs []int64) error {
+func (s *LabelsService) AttachLabelsToIssue(ctx context.Context, requesterID, issueID int64, req dto.AttachLabelsRequest) error {
 	if issueID <= 0 {
 		return ErrInvalidIssueID
 	}
 
-	if len(labelIDs) <= 0 {
+	if len(req.LabelIDs) <= 0 {
 		return ErrInvalidLabelID
 	}
 
@@ -252,15 +252,15 @@ func (s *LabelsService) AttachLabelsToIssue(ctx context.Context, requesterID, is
 		return ErrForbidden
 	}
 
-	count, err := s.labelsRepo.CountProjectLabels(ctx, dbIssue.ProjectID, labelIDs)
+	count, err := s.labelsRepo.CountProjectLabels(ctx, dbIssue.ProjectID, req.LabelIDs)
 	if err != nil {
 		return fmt.Errorf("count project labels: %w", err)
 	}
-	if count != int64(len(labelIDs)) {
+	if count != int64(len(req.LabelIDs)) {
 		return ErrLabelDoesNotBelongToProject
 	}
 
-	err = s.labelsRepo.AttachLabelsToIssue(ctx, issueID, labelIDs)
+	err = s.labelsRepo.AttachLabelsToIssue(ctx, issueID, req.LabelIDs)
 	if err != nil {
 		if errors.Is(err, repository.ErrIssueNotFound) {
 			return ErrIssueNotFound
