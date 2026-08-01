@@ -21,4 +21,6 @@ var (
 	ErrInvalidActorID                = errors.New("invalid actor id")
 	ErrInvalidActivityType           = errors.New("invalid activity type")
 	ErrAttachmentNotFound            = errors.New("attachment not found")
+	ErrLabelAlreadyExists            = errors.New("label already exists")
+	ErrLabelNotFound                 = errors.New("label not found")
 )

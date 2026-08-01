@@ -24,6 +24,7 @@ const (
 	ActivityTypeCOMMENTCREATED       ActivityType = "COMMENT_CREATED"
 	ActivityTypeCOMMENTUPDATED       ActivityType = "COMMENT_UPDATED"
 	ActivityTypeCOMMENTDELETED       ActivityType = "COMMENT_DELETED"
+	ActivityTypeDUEDATECHANGED       ActivityType = "DUE_DATE_CHANGED"
 )
 
 func (e *ActivityType) Scan(src interface{}) error {
@@ -238,6 +239,23 @@ type IssueAttachment struct {
 	FileSize     int64              `json:"file_size"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type IssueLabel struct {
+	IssueID   int64              `json:"issue_id"`
+	LabelID   int64              `json:"label_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type Label struct {
+	ID        int64              `json:"id"`
+	ProjectID int64              `json:"project_id"`
+	Name      string             `json:"name"`
+	Color     string             `json:"color"`
+	CreatedBy int64              `json:"created_by"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type Project struct {
