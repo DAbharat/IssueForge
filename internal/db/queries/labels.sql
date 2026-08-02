@@ -46,10 +46,10 @@ AND deleted_at IS NULL;
 
 
 -- name: CountProjectLabels :one
-SELECT COUNT(*)
+SELECT COUNT(*) 
 FROM labels
-WHERE project_id = $1
-AND id = ANY($2::bigint[])
+WHERE project_id = sqlc.arg(project_id)
+AND id = ANY(sqlc.arg(label_ids)::bigint[])
 AND deleted_at IS NULL;
 
 

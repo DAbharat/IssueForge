@@ -30,7 +30,7 @@ func (q *Queries) AttachLabelsToIssue(ctx context.Context, arg AttachLabelsToIss
 }
 
 const countProjectLabels = `-- name: CountProjectLabels :one
-SELECT COUNT(*)
+SELECT COUNT(*) 
 FROM labels
 WHERE project_id = $1
 AND id = ANY($2::bigint[])
@@ -39,11 +39,11 @@ AND deleted_at IS NULL
 
 type CountProjectLabelsParams struct {
 	ProjectID int64   `json:"project_id"`
-	Column2   []int64 `json:"column_2"`
+	LabelIds  []int64 `json:"label_ids"`
 }
 
 func (q *Queries) CountProjectLabels(ctx context.Context, arg CountProjectLabelsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countProjectLabels, arg.ProjectID, arg.Column2)
+	row := q.db.QueryRow(ctx, countProjectLabels, arg.ProjectID, arg.LabelIds)
 	var count int64
 	err := row.Scan(&count)
 	return count, err

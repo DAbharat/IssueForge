@@ -176,3 +176,16 @@ func (r *LabelsRepository) ListIssueLabels(ctx context.Context, issueID int64) (
 	}
 	return labels, nil
 }
+
+func (r *LabelsRepository) CountProjectLabels(ctx context.Context, projectID int64, labelIDs []int64) (int64, error) {
+	params := sqlc.CountProjectLabelsParams{
+		ProjectID: projectID,
+		LabelIds:  labelIDs,
+	}
+
+	count, err := r.queries.CountProjectLabels(ctx, params)
+	if err != nil {
+		return 0, fmt.Errorf("count project labels: %w", err)
+	}
+	return count, nil
+}

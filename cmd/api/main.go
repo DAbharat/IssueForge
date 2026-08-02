@@ -101,7 +101,11 @@ func main() {
 	issueAttachmentsService := service.NewIssueAttachmentsService(issueAttachmentsRepo, issueRepo, commentRepo, cloudStorage, authzService)
 	issueAttachmentsHandler := handler.NewIssueAttachmentsHandler(issueAttachmentsService)
 
-	r := router.New(userHandler, projectHandler, projectMemberHandler, workspaceHandler, workspaceMemberHandler, issueHandler, commentHandler, issueActivityHandler, issueAttachmentsHandler, authMiddleware)
+	labelsRepo := repository.NewLabelsRepository(queries)
+	labelsService := service.NewLabelsService(labelsRepo, issueRepo, authzService)
+	labelsHandler := handler.NewLabelsHandler(labelsService)
+
+	r := router.New(userHandler, projectHandler, projectMemberHandler, workspaceHandler, workspaceMemberHandler, issueHandler, commentHandler, issueActivityHandler, issueAttachmentsHandler, labelsHandler, authMiddleware)
 
 	corsHandler := handlers.CORS(
 		handlers.AllowedOrigins([]string{"http://localhost:3000"}),

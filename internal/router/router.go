@@ -7,7 +7,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func New(userHandler *handler.UserHandler, projectHandler *handler.ProjectHandler, projectMemberHandler *handler.ProjectMemberHandler, workspaceHandler *handler.WorkspaceHandler, workspaceMemberHandler *handler.WorkspaceMemberHandler, issueHandler *handler.IssueHandler, commentHandler *handler.CommentHandler, issueActivityHandler *handler.IssueActivityHandler, issueAttachmentsHandler *handler.IssueAttachmentsHandler, authMiddleware *middleware.AuthMiddleware) *mux.Router {
+func New(userHandler *handler.UserHandler, projectHandler *handler.ProjectHandler, projectMemberHandler *handler.ProjectMemberHandler, workspaceHandler *handler.WorkspaceHandler, workspaceMemberHandler *handler.WorkspaceMemberHandler, issueHandler *handler.IssueHandler, commentHandler *handler.CommentHandler, issueActivityHandler *handler.IssueActivityHandler, issueAttachmentsHandler *handler.IssueAttachmentsHandler, labelsHandler *handler.LabelsHandler, authMiddleware *middleware.AuthMiddleware) *mux.Router {
 	r := mux.NewRouter()
 
 	registerHealthRoutes(r)
@@ -20,6 +20,7 @@ func New(userHandler *handler.UserHandler, projectHandler *handler.ProjectHandle
 	registerCommentRoutes(r, commentHandler, authMiddleware)
 	registerIssueActivityRouter(r, issueActivityHandler, authMiddleware)
 	registerIssueAttachmentsRoutes(r, issueAttachmentsHandler, authMiddleware)
+	registerLabelsRoutes(r, labelsHandler, authMiddleware)
 
 	return r
 }
