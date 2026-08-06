@@ -20,6 +20,7 @@ var (
 	ErrProjectMemberValidationFailed = errors.New("cannot add user in this project")
 	ErrUserNotProjectMember          = errors.New("user is not the member of this project")
 	ErrWorkspaceMemberAlreadyExists  = errors.New("member already exists in this workspace")
+	ErrWorkspaceAlreadyExists        = errors.New("workspace with this name already exists")
 	ErrWorkspaceMemberNotFound       = errors.New("member does not exist in this workspace")
 	ErrInvalidRole                   = errors.New("invalid role")
 	ErrLeadUnchanged                 = errors.New("lead is already assigned")

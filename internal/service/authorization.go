@@ -12,6 +12,7 @@ type AuthorizationRepo interface {
 	IsWorkspaceMember(ctx context.Context, workspaceID, userID int64) (auth.UserRole, error)
 	IsProjectLead(ctx context.Context, projectID, userID int64) (bool, error)
 	IsProjectMember(ctx context.Context, projectID, userID int64) (bool, error)
+	IsWorkspaceAdminIncludingDeleted(ctx context.Context, workspaceID, userID int64) (auth.UserRole, error)
 }
 
 type AuthorizationService struct {
@@ -31,6 +32,22 @@ func (a *AuthorizationService) RequireWorkspaceAdmin(ctx context.Context, worksp
 			return auth.ErrForbidden
 		}
 		return fmt.Errorf("get workspace role: %w", err)
+	}
+
+	if role != auth.RoleAdmin {
+		return auth.ErrForbidden
+	}
+
+	return nil
+}
+
+func (a *AuthorizationService) RequireWorkspaceAdminIncludingDeleted(ctx context.Context, workspaceID, userID int64) error {
+	role, err := a.repo.IsWorkspaceAdminIncludingDeleted(ctx, workspaceID, userID)
+	if err != nil {
+		if errors.Is(err, auth.ErrMembershipNotFound) {
+			return auth.ErrForbidden
+		}
+		return fmt.Errorf("is workspace admin including deleted: %w", err)
 	}
 
 	if role != auth.RoleAdmin {

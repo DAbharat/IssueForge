@@ -8,6 +8,7 @@ var (
 	ErrWorkspaceMemberNotFound       = errors.New("member does not exist in this workspace")
 	ErrDuplicateEmail                = errors.New("email already exists")
 	ErrUserNotFound                  = errors.New("user not found")
+	ErrWorkspaceAdminNotFound        = errors.New("workspace admin not found")
 	ErrWorkspaceAlreadyExists        = errors.New("workspace with this name already exists")
 	ErrProjectAlreadyExists          = errors.New("project with this name already exists")
 	ErrProjectMemberAlreadyExists    = errors.New("member already exists in this project")

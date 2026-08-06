@@ -51,7 +51,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("load redis: %v", err)
 	}
-	_ = redisClient
+	projectCache := redis.NewRedisProjectCache(redisClient, cfg.RedisTTL)
+	workspaceCache := redis.NewRedisWorkspaceCache(redisClient, cfg.RedisTTL)
 
 	cld, err := cloudinary.NewFromParams(
 		cfg.CloudinaryCloudName,
@@ -74,7 +75,7 @@ func main() {
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWTSecret)
 
 	projectRepo := repository.NewProjectRepository(pool, queries)
-	projectService := service.NewProjectService(projectRepo, authzService)
+	projectService := service.NewProjectService(projectRepo, projectCache, authzService)
 	projectHandler := handler.NewProjectHandler(projectService)
 
 	projectMemberRepo := repository.NewProjectMemberRepository(queries)
@@ -85,7 +86,7 @@ func main() {
 	workspaceMemberHandler := handler.NewWorkspaceMemberHandler(workspaceMemberService)
 
 	workspaceRepo := repository.NewWorkspaceRepository(queries)
-	workspaceService := service.NewWorkspaceService(workspaceRepo, workspaceMemberRepo, authzService)
+	workspaceService := service.NewWorkspaceService(workspaceRepo, workspaceCache, workspaceMemberRepo, authzService)
 	workspaceHandler := handler.NewWorkspaceHandler(workspaceService)
 
 	issueRepo := repository.NewIssueRepository(queries)

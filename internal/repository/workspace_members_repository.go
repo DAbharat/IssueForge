@@ -83,6 +83,22 @@ func (r *WorkspaceMemberRepository) IsWorkspaceMember(ctx context.Context, works
 	return role, nil
 }
 
+func (r *WorkspaceMemberRepository) IsWorkspaceAdminIncludingDeleted(ctx context.Context, workspaceID, userID int64) (sqlc.UserRole, error) {
+	params := sqlc.IsWorkspaceAdminIncludingDeletedParams{
+		WorkspaceID: workspaceID,
+		UserID:      userID,
+	}
+
+	role, err := r.queries.IsWorkspaceAdminIncludingDeleted(ctx, params)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrWorkspaceAdminNotFound
+		}
+		return "", fmt.Errorf("is workspace admin including deleted")
+	}
+	return role, nil
+}
+
 func (r *WorkspaceMemberRepository) ListUserWorkspaces(ctx context.Context, userID int64, search string) ([]sqlc.ListUserWorkspacesRow, error) {
 	params := sqlc.ListUserWorkspacesParams{
 		UserID: userID,

@@ -11,5 +11,6 @@ const (
 
 var (
 	ErrForbidden          = errors.New("forbidden")
+	ErrAdminNotFound      = errors.New("admin not found")
 	ErrMembershipNotFound = errors.New("workspace membership not found")
 )

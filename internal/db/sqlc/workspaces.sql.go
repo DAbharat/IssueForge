@@ -7,6 +7,8 @@ package sqlc
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createWorkspace = `-- name: CreateWorkspace :one
@@ -19,9 +21,16 @@ VALUES (
 RETURNING id, name, created_at, updated_at
 `
 
-func (q *Queries) CreateWorkspace(ctx context.Context, name string) (Workspace, error) {
+type CreateWorkspaceRow struct {
+	ID        int64              `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) CreateWorkspace(ctx context.Context, name string) (CreateWorkspaceRow, error) {
 	row := q.db.QueryRow(ctx, createWorkspace, name)
-	var i Workspace
+	var i CreateWorkspaceRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -31,15 +40,36 @@ func (q *Queries) CreateWorkspace(ctx context.Context, name string) (Workspace, 
 	return i, err
 }
 
+const deleteWorkspace = `-- name: DeleteWorkspace :one
+UPDATE workspaces
+SET deleted_at = NOW()
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id
+`
+
+func (q *Queries) DeleteWorkspace(ctx context.Context, id int64) (int64, error) {
+	row := q.db.QueryRow(ctx, deleteWorkspace, id)
+	var id_2 int64
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
 const getWorkspaceByID = `-- name: GetWorkspaceByID :one
 SELECT id, name, created_at, updated_at
 FROM workspaces
-WHERE id = $1
+WHERE id = $1 AND deleted_at IS NULL
 `
 
-func (q *Queries) GetWorkspaceByID(ctx context.Context, id int64) (Workspace, error) {
+type GetWorkspaceByIDRow struct {
+	ID        int64              `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetWorkspaceByID(ctx context.Context, id int64) (GetWorkspaceByIDRow, error) {
 	row := q.db.QueryRow(ctx, getWorkspaceByID, id)
-	var i Workspace
+	var i GetWorkspaceByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -52,12 +82,76 @@ func (q *Queries) GetWorkspaceByID(ctx context.Context, id int64) (Workspace, er
 const getWorkspaceByName = `-- name: GetWorkspaceByName :one
 SELECT id, name, created_at, updated_at
 FROM workspaces
-WHERE name = $1
+WHERE name = $1 AND deleted_at IS NULL
 `
 
-func (q *Queries) GetWorkspaceByName(ctx context.Context, name string) (Workspace, error) {
+type GetWorkspaceByNameRow struct {
+	ID        int64              `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetWorkspaceByName(ctx context.Context, name string) (GetWorkspaceByNameRow, error) {
 	row := q.db.QueryRow(ctx, getWorkspaceByName, name)
-	var i Workspace
+	var i GetWorkspaceByNameRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const restoreDeletedWorkspace = `-- name: RestoreDeletedWorkspace :one
+UPDATE workspaces
+SET deleted_at = NULL
+WHERE id = $1 AND deleted_at IS NOT NULL
+RETURNING id, name, created_at, updated_at
+`
+
+type RestoreDeletedWorkspaceRow struct {
+	ID        int64              `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) RestoreDeletedWorkspace(ctx context.Context, id int64) (RestoreDeletedWorkspaceRow, error) {
+	row := q.db.QueryRow(ctx, restoreDeletedWorkspace, id)
+	var i RestoreDeletedWorkspaceRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateWorkspaceName = `-- name: UpdateWorkspaceName :one
+UPDATE workspaces
+SET name = $1
+WHERE id = $2 AND deleted_at IS NULL
+RETURNING id, name, created_at, updated_at
+`
+
+type UpdateWorkspaceNameParams struct {
+	Name string `json:"name"`
+	ID   int64  `json:"id"`
+}
+
+type UpdateWorkspaceNameRow struct {
+	ID        int64              `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) UpdateWorkspaceName(ctx context.Context, arg UpdateWorkspaceNameParams) (UpdateWorkspaceNameRow, error) {
+	row := q.db.QueryRow(ctx, updateWorkspaceName, arg.Name, arg.ID)
+	var i UpdateWorkspaceNameRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,

@@ -39,6 +39,22 @@ func (r *AuthorizationRepository) IsWorkspaceMember(ctx context.Context, workspa
 	return auth.UserRole(role), nil
 }
 
+func (r *AuthorizationRepository) IsWorkspaceAdminIncludingDeleted(ctx context.Context, workspaceID, userID int64) (auth.UserRole, error) {
+	params := sqlc.IsWorkspaceAdminIncludingDeletedParams{
+		WorkspaceID: workspaceID,
+		UserID:      userID,
+	}
+
+	role, err := r.queries.IsWorkspaceAdminIncludingDeleted(ctx, params)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", auth.ErrMembershipNotFound
+		}
+		return "", fmt.Errorf("check workspace admin inlcuding deleted: %w", err)
+	}
+	return auth.UserRole(role), nil
+}
+
 func (r *AuthorizationRepository) IsProjectLead(ctx context.Context, projectID, userID int64) (bool, error) {
 	params := sqlc.IsProjectLeadParams{
 		ID:     projectID,

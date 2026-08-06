@@ -3,6 +3,7 @@ package service
 import (
 	"IssueForge/internal/db/sqlc"
 	"IssueForge/internal/dto"
+	"IssueForge/internal/redis"
 	"IssueForge/internal/repository"
 	"context"
 	"errors"
@@ -22,14 +23,22 @@ type ProjectRepo interface {
 }
 
 type ProjectService struct {
-	projectRepo ProjectRepo
-	authz       AuthzService
+	projectRepo  ProjectRepo
+	projectCache redis.ProjectCache
+	authz        AuthzService
 }
 
-func NewProjectService(repo ProjectRepo, authz AuthzService) *ProjectService {
+func NewProjectService(repo ProjectRepo, projectCache redis.ProjectCache, authz AuthzService) *ProjectService {
 	return &ProjectService{
-		projectRepo: repo,
-		authz:       authz,
+		projectRepo:  repo,
+		projectCache: projectCache,
+		authz:        authz,
+	}
+}
+
+func (s *ProjectService) invalidateProjectCache(ctx context.Context, projectID int64) {
+	if err := s.projectCache.DeleteProject(ctx, projectID); err != nil {
+		log.Printf("failed to invalidate project cache: %v", err)
 	}
 }
 
@@ -74,6 +83,16 @@ func (s *ProjectService) GetProjectByID(ctx context.Context, requesterID, projec
 		return dto.ProjectResponse{}, ErrInvalidProjectID
 	}
 
+	cachedProject, found, err := s.projectCache.GetProject(ctx, projectID)
+	if err != nil {
+		log.Printf("redis get failed: %v", err)
+	}
+	if found {
+		log.Println("CACHE HIT")
+		return cachedProject, nil
+	}
+	log.Println("CACHE MISS")
+
 	project, err := s.projectRepo.GetProjectByID(ctx, projectID)
 	if err != nil {
 		if errors.Is(err, repository.ErrProjectNotFound) {
@@ -85,7 +104,8 @@ func (s *ProjectService) GetProjectByID(ctx context.Context, requesterID, projec
 	if err := s.authz.RequireProjectMember(ctx, project.ID, requesterID); err != nil {
 		return dto.ProjectResponse{}, err
 	}
-	return dto.ProjectResponse{
+
+	response := dto.ProjectResponse{
 		ID:          project.ID,
 		WorkspaceID: project.WorkspaceID,
 		LeadID:      project.LeadID,
@@ -93,7 +113,13 @@ func (s *ProjectService) GetProjectByID(ctx context.Context, requesterID, projec
 		Description: project.Description,
 		CreatedAt:   project.CreatedAt.Time,
 		UpdatedAt:   project.UpdatedAt.Time,
-	}, nil
+	}
+	if err := s.projectCache.SetProject(ctx, response); err != nil {
+		log.Printf("redis set fail: %v", err)
+	}
+	log.Println("CACHE SET")
+
+	return response, nil
 }
 
 func (s *ProjectService) UpdateProjectDetails(ctx context.Context, requesterID int64, req dto.UpdateProjectDetailsRequest, projectID int64) (dto.ProjectResponse, error) {
@@ -137,6 +163,9 @@ func (s *ProjectService) UpdateProjectDetails(ctx context.Context, requesterID i
 		}
 		return dto.ProjectResponse{}, fmt.Errorf("update project details: %w", err)
 	}
+
+	s.invalidateProjectCache(ctx, project.ID)
+
 	return dto.ProjectResponse{
 		ID:          project.ID,
 		WorkspaceID: project.WorkspaceID,
@@ -185,6 +214,9 @@ func (s *ProjectService) UpdateProjectLead(ctx context.Context, requesterID int6
 		}
 		return dto.ProjectResponse{}, fmt.Errorf("update project lead :%w", err)
 	}
+
+	s.invalidateProjectCache(ctx, project.ID)
+
 	return dto.ProjectResponse{
 		ID:          project.ID,
 		WorkspaceID: project.WorkspaceID,
@@ -223,6 +255,9 @@ func (s *ProjectService) DeleteProject(ctx context.Context, requesterID, project
 		}
 		return dto.ProjectResponse{}, fmt.Errorf("delete project: %w", err)
 	}
+
+	s.invalidateProjectCache(ctx, project.ID)
+
 	return dto.ProjectResponse{
 		ID:          project.ID,
 		WorkspaceID: project.WorkspaceID,
