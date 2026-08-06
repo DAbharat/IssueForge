@@ -21,7 +21,7 @@ INSERT INTO projects(
 VALUES(
     $1, $2, $3, $4
 )
-RETURNING id, workspace_id, lead_id, name, description, created_at
+RETURNING id, workspace_id, lead_id, name, description, created_at, updated_at, deleted_at
 `
 
 type CreateProjectParams struct {
@@ -31,23 +31,14 @@ type CreateProjectParams struct {
 	Description string `json:"description"`
 }
 
-type CreateProjectRow struct {
-	ID          int64              `json:"id"`
-	WorkspaceID int64              `json:"workspace_id"`
-	LeadID      int64              `json:"lead_id"`
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-}
-
-func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (CreateProjectRow, error) {
+func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error) {
 	row := q.db.QueryRow(ctx, createProject,
 		arg.WorkspaceID,
 		arg.LeadID,
 		arg.Name,
 		arg.Description,
 	)
-	var i CreateProjectRow
+	var i Project
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
@@ -55,6 +46,59 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (C
 		&i.Name,
 		&i.Description,
 		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const deleteProject = `-- name: DeleteProject :one
+UPDATE projects
+SET deleted_at = NOW()
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id, workspace_id, lead_id
+`
+
+type DeleteProjectRow struct {
+	ID          int64 `json:"id"`
+	WorkspaceID int64 `json:"workspace_id"`
+	LeadID      int64 `json:"lead_id"`
+}
+
+func (q *Queries) DeleteProject(ctx context.Context, id int64) (DeleteProjectRow, error) {
+	row := q.db.QueryRow(ctx, deleteProject, id)
+	var i DeleteProjectRow
+	err := row.Scan(&i.ID, &i.WorkspaceID, &i.LeadID)
+	return i, err
+}
+
+const getProjectByID = `-- name: GetProjectByID :one
+SELECT id, workspace_id, lead_id, name, description, created_at, updated_at
+FROM projects
+WHERE id = $1 AND deleted_at IS NULL
+`
+
+type GetProjectByIDRow struct {
+	ID          int64              `json:"id"`
+	WorkspaceID int64              `json:"workspace_id"`
+	LeadID      int64              `json:"lead_id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetProjectByID(ctx context.Context, id int64) (GetProjectByIDRow, error) {
+	row := q.db.QueryRow(ctx, getProjectByID, id)
+	var i GetProjectByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.LeadID,
+		&i.Name,
+		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -63,7 +107,7 @@ const isProjectLead = `-- name: IsProjectLead :one
 SELECT EXISTS (
     SELECT 1
     FROM projects
-    WHERE id = $1 AND lead_id = $2
+    WHERE id = $1 AND lead_id = $2 AND deleted_at IS NULL
 )
 `
 
@@ -82,19 +126,35 @@ func (q *Queries) IsProjectLead(ctx context.Context, arg IsProjectLeadParams) (b
 const listProjectsByLead = `-- name: ListProjectsByLead :many
 SELECT id, workspace_id, lead_id, name, description, created_at, updated_at
 FROM projects
-WHERE lead_id = $1
+WHERE workspace_id = $1 AND deleted_at IS NULL
+    AND ($2::BIGINT IS NULL OR lead_id = $2::BIGINT)
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListProjectsByLead(ctx context.Context, leadID int64) ([]Project, error) {
-	rows, err := q.db.Query(ctx, listProjectsByLead, leadID)
+type ListProjectsByLeadParams struct {
+	WorkspaceID int64       `json:"workspace_id"`
+	LeadID      pgtype.Int8 `json:"lead_id"`
+}
+
+type ListProjectsByLeadRow struct {
+	ID          int64              `json:"id"`
+	WorkspaceID int64              `json:"workspace_id"`
+	LeadID      int64              `json:"lead_id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) ListProjectsByLead(ctx context.Context, arg ListProjectsByLeadParams) ([]ListProjectsByLeadRow, error) {
+	rows, err := q.db.Query(ctx, listProjectsByLead, arg.WorkspaceID, arg.LeadID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Project
+	var items []ListProjectsByLeadRow
 	for rows.Next() {
-		var i Project
+		var i ListProjectsByLeadRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
@@ -114,37 +174,60 @@ func (q *Queries) ListProjectsByLead(ctx context.Context, leadID int64) ([]Proje
 	return items, nil
 }
 
-const listProjectsByWorkspace = `-- name: ListProjectsByWorkspace :many
-SELECT id, workspace_id, lead_id, name, description, created_at, updated_at
-FROM projects
-WHERE workspace_id = $1
-ORDER BY created_at DESC
+const updateProjectDetails = `-- name: UpdateProjectDetails :one
+UPDATE projects
+SET name = COALESCE($1, name),
+    description = COALESCE($2, description)
+WHERE id = $3 AND deleted_at IS NULL
+RETURNING id, workspace_id, lead_id, name, description, created_at, updated_at, deleted_at
 `
 
-func (q *Queries) ListProjectsByWorkspace(ctx context.Context, workspaceID int64) ([]Project, error) {
-	rows, err := q.db.Query(ctx, listProjectsByWorkspace, workspaceID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Project
-	for rows.Next() {
-		var i Project
-		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.LeadID,
-			&i.Name,
-			&i.Description,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+type UpdateProjectDetailsParams struct {
+	Name        pgtype.Text `json:"name"`
+	Description pgtype.Text `json:"description"`
+	ID          int64       `json:"id"`
+}
+
+func (q *Queries) UpdateProjectDetails(ctx context.Context, arg UpdateProjectDetailsParams) (Project, error) {
+	row := q.db.QueryRow(ctx, updateProjectDetails, arg.Name, arg.Description, arg.ID)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.LeadID,
+		&i.Name,
+		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const updateProjectLead = `-- name: UpdateProjectLead :one
+UPDATE projects
+SET lead_id = COALESCE($1, lead_id)
+WHERE id = $2 AND deleted_at IS NULL
+RETURNING id, workspace_id, lead_id, name, description, created_at, updated_at, deleted_at
+`
+
+type UpdateProjectLeadParams struct {
+	LeadID pgtype.Int8 `json:"lead_id"`
+	ID     int64       `json:"id"`
+}
+
+func (q *Queries) UpdateProjectLead(ctx context.Context, arg UpdateProjectLeadParams) (Project, error) {
+	row := q.db.QueryRow(ctx, updateProjectLead, arg.LeadID, arg.ID)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.LeadID,
+		&i.Name,
+		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
 }

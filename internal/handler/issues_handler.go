@@ -152,7 +152,7 @@ func (h *IssueHandler) ListProjectIssues(w http.ResponseWriter, r *http.Request)
 		req.Search = &value
 	}
 
-	if value := r.URL.Query().Get("assigend_to"); value != "" {
+	if value := r.URL.Query().Get("assigned_to"); value != "" {
 		id, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidAssignee.Error())

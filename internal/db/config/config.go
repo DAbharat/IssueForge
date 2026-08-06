@@ -18,11 +18,14 @@ type Config struct {
 	CloudinaryCloudName string
 	CloudinaryAPIKey    string
 	CloudinaryAPISecret string
+	RedisAddr           string
+	RedisPassword       string
+	RedisDB             int
 }
 
 func Load() (*Config, error) {
 
-	requiredEnvVars := []string{"DB_HOST", "DB_PASSWORD", "DB_USER", "DB_PORT", "DB_NAME", "JWTSecret", "CLOUDINARY_URL", "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"}
+	requiredEnvVars := []string{"DB_HOST", "DB_PASSWORD", "DB_USER", "DB_PORT", "DB_NAME", "JWTSecret", "CLOUDINARY_URL", "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "REDIS_ADDR", "REDIS_DB"}
 	missingVars := checkMissingENV(requiredEnvVars)
 
 	if len(missingVars) > 0 {
@@ -30,9 +33,13 @@ func Load() (*Config, error) {
 	}
 
 	port, err := strconv.Atoi(os.Getenv("DB_PORT"))
+	redisDB, redErr := strconv.Atoi(os.Getenv("REDIS_DB"))
 
 	if err != nil {
 		return nil, fmt.Errorf("invalid DB_PORT: %w", err)
+	}
+	if redErr != nil {
+		return nil, fmt.Errorf("invalid REDIS_DB: %w", err)
 	}
 
 	cfg := &Config{
@@ -46,9 +53,12 @@ func Load() (*Config, error) {
 		CloudinaryCloudName: os.Getenv("CLOUDINARY_CLOUD_NAME"),
 		CloudinaryAPIKey:    os.Getenv("CLOUDINARY_API_KEY"),
 		CloudinaryAPISecret: os.Getenv("CLOUDINARY_API_SECRET"),
+		RedisAddr:           os.Getenv("REDIS_ADDR"),
+		RedisPassword:       os.Getenv("REDIS_PASSWORD"),
+		RedisDB:             redisDB,
 	}
 	if cfg.JWTSecret == "" {
-		return &Config{}, errors.New("JWT_SECRET is required")
+		return &Config{}, errors.New("JWTSecret is required")
 	}
 
 	return cfg, nil

@@ -6,6 +6,7 @@ import (
 	"IssueForge/internal/db/sqlc"
 	"IssueForge/internal/handler"
 	"IssueForge/internal/middleware"
+	"IssueForge/internal/redis"
 	"IssueForge/internal/repository"
 	"IssueForge/internal/router"
 	"IssueForge/internal/service"
@@ -45,6 +46,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("load postgres: %v", err)
 	}
+
+	redisClient, err := redis.NewClient(cfg)
+	if err != nil {
+		log.Fatalf("load redis: %v", err)
+	}
+	_ = redisClient
 
 	cld, err := cloudinary.NewFromParams(
 		cfg.CloudinaryCloudName,

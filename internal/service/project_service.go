@@ -3,6 +3,7 @@ package service
 import (
 	"IssueForge/internal/db/sqlc"
 	"IssueForge/internal/dto"
+	"IssueForge/internal/repository"
 	"context"
 	"errors"
 	"fmt"
@@ -12,9 +13,12 @@ import (
 )
 
 type ProjectRepo interface {
-	CreateProject(ctx context.Context, workspaceID, leadID int64, name, description string) (sqlc.CreateProjectRow, error)
-	ListProjectsByLead(ctx context.Context, leadID int64) ([]sqlc.Project, error)
-	ListProjectsByWorkspace(ctx context.Context, workspaceID int64) ([]sqlc.Project, error)
+	CreateProject(ctx context.Context, workspaceID, leadID int64, name, description string) (sqlc.Project, error)
+	GetProjectByID(ctx context.Context, projectID int64) (sqlc.GetProjectByIDRow, error)
+	UpdateProjectDetails(ctx context.Context, name, description *string, id int64) (sqlc.Project, error)
+	UpdateProjectLead(ctx context.Context, leadID *int64, projectID int64) (sqlc.Project, error)
+	DeleteProject(ctx context.Context, id int64) (sqlc.DeleteProjectRow, error)
+	ListProjectsByLead(ctx context.Context, workspaceID int64, leadID *int64) ([]sqlc.ListProjectsByLeadRow, error)
 }
 
 type ProjectService struct {
@@ -60,11 +64,184 @@ func (s *ProjectService) CreateProject(ctx context.Context, leadID int64, req dt
 		LeadID:      project.LeadID,
 		Name:        project.Name,
 		Description: project.Description,
+		CreatedAt:   project.CreatedAt.Time,
+		UpdatedAt:   project.UpdatedAt.Time,
 	}, nil
 }
 
-func (s *ProjectService) ListProjectsByLead(ctx context.Context, leadID int64) ([]dto.ProjectResponse, error) {
-	dbProjects, err := s.projectRepo.ListProjectsByLead(ctx, leadID)
+func (s *ProjectService) GetProjectByID(ctx context.Context, requesterID, projectID int64) (dto.ProjectResponse, error) {
+	if projectID <= 0 {
+		return dto.ProjectResponse{}, ErrInvalidProjectID
+	}
+
+	project, err := s.projectRepo.GetProjectByID(ctx, projectID)
+	if err != nil {
+		if errors.Is(err, repository.ErrProjectNotFound) {
+			return dto.ProjectResponse{}, ErrProjectNotFound
+		}
+		return dto.ProjectResponse{}, fmt.Errorf("get project by id: %w", err)
+	}
+
+	if err := s.authz.RequireProjectMember(ctx, project.ID, requesterID); err != nil {
+		return dto.ProjectResponse{}, err
+	}
+	return dto.ProjectResponse{
+		ID:          project.ID,
+		WorkspaceID: project.WorkspaceID,
+		LeadID:      project.LeadID,
+		Name:        project.Name,
+		Description: project.Description,
+		CreatedAt:   project.CreatedAt.Time,
+		UpdatedAt:   project.UpdatedAt.Time,
+	}, nil
+}
+
+func (s *ProjectService) UpdateProjectDetails(ctx context.Context, requesterID int64, req dto.UpdateProjectDetailsRequest, projectID int64) (dto.ProjectResponse, error) {
+	if projectID <= 0 {
+		return dto.ProjectResponse{}, ErrInvalidProjectID
+	}
+
+	if req.Name != nil {
+		*req.Name = strings.TrimSpace(*req.Name)
+		if utf8.RuneCountInString(*req.Name) < 3 || utf8.RuneCountInString(*req.Name) > 100 {
+			return dto.ProjectResponse{}, ErrInvalidProjectName
+		}
+	}
+
+	if req.Description != nil {
+		*req.Description = strings.TrimSpace(*req.Description)
+		if utf8.RuneCountInString(*req.Description) < 10 || utf8.RuneCountInString(*req.Description) > 300 {
+			return dto.ProjectResponse{}, ErrInvalidDescription
+		}
+	}
+
+	dbProject, err := s.projectRepo.GetProjectByID(ctx, projectID)
+	if err != nil {
+		if errors.Is(err, repository.ErrProjectNotFound) {
+			return dto.ProjectResponse{}, ErrProjectNotFound
+		}
+		return dto.ProjectResponse{}, fmt.Errorf("get project by id: %w", err)
+	}
+
+	if err := s.authz.RequireProjectLead(ctx, dbProject.ID, requesterID); err != nil {
+		return dto.ProjectResponse{}, err
+	}
+
+	project, err := s.projectRepo.UpdateProjectDetails(ctx, req.Name, req.Description, dbProject.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrProjectNotFound) {
+			return dto.ProjectResponse{}, ErrProjectNotFound
+		}
+		if errors.Is(err, repository.ErrProjectAlreadyExists) {
+			return dto.ProjectResponse{}, ErrProjectAlreadyExists
+		}
+		return dto.ProjectResponse{}, fmt.Errorf("update project details: %w", err)
+	}
+	return dto.ProjectResponse{
+		ID:          project.ID,
+		WorkspaceID: project.WorkspaceID,
+		LeadID:      project.LeadID,
+		Name:        project.Name,
+		Description: project.Description,
+		CreatedAt:   project.CreatedAt.Time,
+		UpdatedAt:   project.UpdatedAt.Time,
+	}, nil
+}
+
+func (s *ProjectService) UpdateProjectLead(ctx context.Context, requesterID int64, req dto.UpdateProjectLeadRequest, projectID int64) (dto.ProjectResponse, error) {
+	if projectID <= 0 {
+		return dto.ProjectResponse{}, ErrInvalidProjectID
+	}
+
+	if req.LeadID != nil {
+		if *req.LeadID <= 0 {
+			return dto.ProjectResponse{}, ErrInvalidLeadID
+		}
+	}
+
+	dbProject, err := s.projectRepo.GetProjectByID(ctx, projectID)
+	if err != nil {
+		if errors.Is(err, repository.ErrProjectNotFound) {
+			return dto.ProjectResponse{}, ErrProjectNotFound
+		}
+		return dto.ProjectResponse{}, fmt.Errorf("get project by id: %w", err)
+	}
+
+	if err := s.authz.RequireProjectLead(ctx, dbProject.ID, requesterID); err != nil {
+		return dto.ProjectResponse{}, err
+	}
+	if err := s.authz.RequireProjectMember(ctx, dbProject.ID, *req.LeadID); err != nil {
+		return dto.ProjectResponse{}, ErrUserNotProjectMember
+	}
+
+	if *req.LeadID == dbProject.LeadID {
+		return dto.ProjectResponse{}, ErrLeadUnchanged
+	}
+
+	project, err := s.projectRepo.UpdateProjectLead(ctx, req.LeadID, dbProject.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return dto.ProjectResponse{}, ErrUserNotFound
+		}
+		return dto.ProjectResponse{}, fmt.Errorf("update project lead :%w", err)
+	}
+	return dto.ProjectResponse{
+		ID:          project.ID,
+		WorkspaceID: project.WorkspaceID,
+		LeadID:      project.LeadID,
+		Name:        project.Name,
+		Description: project.Description,
+		CreatedAt:   project.CreatedAt.Time,
+		UpdatedAt:   project.UpdatedAt.Time,
+	}, nil
+}
+
+func (s *ProjectService) DeleteProject(ctx context.Context, requesterID, projectID int64) (dto.ProjectResponse, error) {
+	if projectID <= 0 {
+		return dto.ProjectResponse{}, ErrInvalidProjectID
+	}
+
+	dbProject, err := s.projectRepo.GetProjectByID(ctx, projectID)
+	if err != nil {
+		if errors.Is(err, repository.ErrProjectNotFound) {
+			return dto.ProjectResponse{}, ErrProjectNotFound
+		}
+		return dto.ProjectResponse{}, fmt.Errorf("get project by id: %w", err)
+	}
+
+	isProjectLead := s.authz.RequireProjectLead(ctx, dbProject.ID, requesterID) == nil
+	isWorkspaceAdmin := s.authz.RequireWorkspaceAdmin(ctx, dbProject.WorkspaceID, requesterID) == nil
+
+	if !isProjectLead && !isWorkspaceAdmin {
+		return dto.ProjectResponse{}, ErrForbidden
+	}
+
+	project, err := s.projectRepo.DeleteProject(ctx, dbProject.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrProjectNotFound) {
+			return dto.ProjectResponse{}, ErrProjectNotFound
+		}
+		return dto.ProjectResponse{}, fmt.Errorf("delete project: %w", err)
+	}
+	return dto.ProjectResponse{
+		ID:          project.ID,
+		WorkspaceID: project.WorkspaceID,
+		LeadID:      project.LeadID,
+	}, nil
+}
+
+func (s *ProjectService) ListProjectsByLead(ctx context.Context, requesterID, workspaceID int64, leadID *int64) ([]dto.ProjectResponse, error) {
+	if err := s.authz.RequireWorkspaceMember(ctx, workspaceID, requesterID); err != nil {
+		return nil, err
+	}
+
+	if leadID != nil {
+		if *leadID <= 0 {
+			return nil, ErrInvalidLeadID
+		}
+	}
+
+	dbProjects, err := s.projectRepo.ListProjectsByLead(ctx, workspaceID, leadID)
 	if err != nil {
 		return nil, fmt.Errorf("list projects by lead service failure: %w", err)
 	}
@@ -72,30 +249,6 @@ func (s *ProjectService) ListProjectsByLead(ctx context.Context, leadID int64) (
 	projects := make([]dto.ProjectResponse, 0, len(dbProjects))
 
 	for _, p := range dbProjects {
-		projects = append(projects, dto.ProjectResponse{
-			ID:          p.ID,
-			WorkspaceID: p.WorkspaceID,
-			LeadID:      p.LeadID,
-			Name:        p.Name,
-			Description: p.Description,
-		})
-	}
-	return projects, nil
-}
-
-func (s *ProjectService) ListProjectsByWorkspace(ctx context.Context, workspaceID, userID int64) ([]dto.ProjectResponse, error) {
-	if err := s.authz.RequireWorkspaceMember(ctx, workspaceID, userID); err != nil {
-		return nil, err
-	}
-
-	workspaceProjects, err := s.projectRepo.ListProjectsByWorkspace(ctx, workspaceID)
-	if err != nil {
-		return nil, fmt.Errorf("list projects by workspaces: %w", err)
-	}
-
-	projects := make([]dto.ProjectResponse, 0, len(workspaceProjects))
-
-	for _, p := range workspaceProjects {
 		projects = append(projects, dto.ProjectResponse{
 			ID:          p.ID,
 			WorkspaceID: p.WorkspaceID,
