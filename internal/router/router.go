@@ -7,19 +7,40 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func New(userHandler *handler.UserHandler, projectHandler *handler.ProjectHandler, projectMemberHandler *handler.ProjectMemberHandler, workspaceHandler *handler.WorkspaceHandler, workspaceMemberHandler *handler.WorkspaceMemberHandler, issueHandler *handler.IssueHandler, commentHandler *handler.CommentHandler, issueActivityHandler *handler.IssueActivityHandler, issueAttachmentsHandler *handler.IssueAttachmentsHandler, labelsHandler *handler.LabelsHandler, authMiddleware *middleware.AuthMiddleware) *mux.Router {
+func New(userHandler *handler.UserHandler,
+	projectHandler *handler.ProjectHandler,
+	projectMemberHandler *handler.ProjectMemberHandler,
+	workspaceHandler *handler.WorkspaceHandler,
+	workspaceMemberHandler *handler.WorkspaceMemberHandler,
+	issueHandler *handler.IssueHandler,
+	commentHandler *handler.CommentHandler,
+	issueActivityHandler *handler.IssueActivityHandler,
+	issueAttachmentsHandler *handler.IssueAttachmentsHandler,
+	labelsHandler *handler.LabelsHandler,
+	authMiddleware *middleware.AuthMiddleware,
+	strictRateLimit *middleware.RateLimitMiddleware,
+	authRateLimit *middleware.RateLimitMiddleware,
+	readRateLimit *middleware.RateLimitMiddleware,
+	attachmentRateLimit *middleware.RateLimitMiddleware,
+	writeRateLimit *middleware.RateLimitMiddleware,
+	issueRateLimit *middleware.RateLimitMiddleware,
+	deleteRateLimit *middleware.RateLimitMiddleware,
+	createRateLimit *middleware.RateLimitMiddleware,
+	patchRateLimit *middleware.RateLimitMiddleware,
+) *mux.Router {
+
 	r := mux.NewRouter()
 
 	registerHealthRoutes(r)
-	registerUserRoutes(r, userHandler, authMiddleware)
-	registerProjectRoutes(r, projectHandler, authMiddleware)
-	registerProjectMembersRoutes(r, projectMemberHandler, authMiddleware)
-	registerWorkspaceRoutes(r, workspaceHandler, authMiddleware)
-	registerWorkspaceMemberRoutes(r, workspaceMemberHandler, authMiddleware)
-	registerIssueRoutes(r, issueHandler, authMiddleware)
+	registerUserRoutes(r, userHandler, authMiddleware, strictRateLimit, authRateLimit, readRateLimit)
+	registerProjectRoutes(r, projectHandler, authMiddleware, readRateLimit, createRateLimit, patchRateLimit)
+	registerProjectMembersRoutes(r, projectMemberHandler, authMiddleware, readRateLimit)
+	registerWorkspaceRoutes(r, workspaceHandler, authMiddleware, readRateLimit, createRateLimit, patchRateLimit)
+	registerWorkspaceMemberRoutes(r, workspaceMemberHandler, authMiddleware, readRateLimit)
+	registerIssueRoutes(r, issueHandler, authMiddleware, createRateLimit, readRateLimit, deleteRateLimit, patchRateLimit)
 	registerCommentRoutes(r, commentHandler, authMiddleware)
 	registerIssueActivityRouter(r, issueActivityHandler, authMiddleware)
-	registerIssueAttachmentsRoutes(r, issueAttachmentsHandler, authMiddleware)
+	registerIssueAttachmentsRoutes(r, issueAttachmentsHandler, authMiddleware, attachmentRateLimit, readRateLimit)
 	registerLabelsRoutes(r, labelsHandler, authMiddleware)
 
 	return r

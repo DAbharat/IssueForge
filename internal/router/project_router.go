@@ -8,21 +8,29 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func registerProjectRoutes(r *mux.Router, projectHandler *handler.ProjectHandler, authMiddleware *middleware.AuthMiddleware) {
+func registerProjectRoutes(r *mux.Router, projectHandler *handler.ProjectHandler, authMiddleware *middleware.AuthMiddleware, readRateLimit, createRateLimit, patchRateLimit *middleware.RateLimitMiddleware) {
 	r.Handle("/api/workspaces/{workspaceID}/projects",
-		authMiddleware.Authenticate(http.HandlerFunc(projectHandler.CreateProject)),
+		authMiddleware.Authenticate(
+			createRateLimit.Limit(http.HandlerFunc(projectHandler.CreateProject)),
+		),
 	).Methods("POST")
 
 	r.Handle("/api/projects/{projectID}",
-		authMiddleware.Authenticate(http.HandlerFunc(projectHandler.GetProjectByID)),
+		authMiddleware.Authenticate(
+			readRateLimit.Limit(http.HandlerFunc(projectHandler.GetProjectByID)),
+		),
 	).Methods("GET")
 
 	r.Handle("/api/projects/{projectID}/details",
-		authMiddleware.Authenticate(http.HandlerFunc(projectHandler.UpdateProjectDetails)),
+		authMiddleware.Authenticate(
+			patchRateLimit.Limit(http.HandlerFunc(projectHandler.UpdateProjectDetails)),
+		),
 	).Methods("PATCH")
 
 	r.Handle("/api/projects/{projectID}/lead",
-		authMiddleware.Authenticate(http.HandlerFunc(projectHandler.UpdateProjectLead)),
+		authMiddleware.Authenticate(
+			patchRateLimit.Limit(http.HandlerFunc(projectHandler.UpdateProjectLead)),
+		),
 	).Methods("PATCH")
 
 	r.Handle("/api/projects/{projectID}",
@@ -30,6 +38,8 @@ func registerProjectRoutes(r *mux.Router, projectHandler *handler.ProjectHandler
 	).Methods("DELETE")
 
 	r.Handle("/api/workspaces/{workspaceID}/projects",
-		authMiddleware.Authenticate(http.HandlerFunc(projectHandler.ListProjectByLead)),
+		authMiddleware.Authenticate(
+			readRateLimit.Limit(http.HandlerFunc(projectHandler.ListProjectByLead)),
+		),
 	).Methods("GET")
 }

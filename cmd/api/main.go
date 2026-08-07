@@ -55,6 +55,18 @@ func main() {
 	workspaceCache := redis.NewRedisWorkspaceCache(redisClient, cfg.RedisTTL)
 	issueCache := redis.NewIssueCache(redisClient, cfg.RedisTTL)
 
+	rateLimiter := redis.NewRateLimiter(redisClient, true)
+
+	strictRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 5, 5.0/60)
+	authRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 3, 3.0/60)
+	readRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 200, 200.0/60)
+	attachmentRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 10, 10.0/60)
+	writeRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 30, 30.0/60)
+	issueRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 60, 60.0/60)
+	deleteRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 20, 20.0/60)
+	createRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 30, 30.0/60)
+	patchRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 60, 60.0/60)
+
 	cld, err := cloudinary.NewFromParams(
 		cfg.CloudinaryCloudName,
 		cfg.CloudinaryAPIKey,
@@ -114,7 +126,27 @@ func main() {
 	labelsService := service.NewLabelsService(labelsRepo, issueRepo, authzService)
 	labelsHandler := handler.NewLabelsHandler(labelsService)
 
-	r := router.New(userHandler, projectHandler, projectMemberHandler, workspaceHandler, workspaceMemberHandler, issueHandler, commentHandler, issueActivityHandler, issueAttachmentsHandler, labelsHandler, authMiddleware)
+	r := router.New(userHandler,
+		projectHandler,
+		projectMemberHandler,
+		workspaceHandler,
+		workspaceMemberHandler,
+		issueHandler,
+		commentHandler,
+		issueActivityHandler,
+		issueAttachmentsHandler,
+		labelsHandler,
+		authMiddleware,
+		strictRateLimit,
+		authRateLimit,
+		readRateLimit,
+		attachmentRateLimit,
+		writeRateLimit,
+		issueRateLimit,
+		deleteRateLimit,
+		createRateLimit,
+		patchRateLimit,
+	)
 
 	corsHandler := handlers.CORS(
 		handlers.AllowedOrigins([]string{"http://localhost:3000"}),

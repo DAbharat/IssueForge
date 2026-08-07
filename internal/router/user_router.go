@@ -8,13 +8,21 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func registerUserRoutes(r *mux.Router, userHandler *handler.UserHandler, authMiddleware *middleware.AuthMiddleware) {
-	r.HandleFunc("/api/register", userHandler.Signup).Methods("POST")
-	r.HandleFunc("/api/login", userHandler.Login).Methods("POST")
+func registerUserRoutes(r *mux.Router, userHandler *handler.UserHandler, authMiddleware *middleware.AuthMiddleware, strictRateLimit, authRateLimit, readRateLimit *middleware.RateLimitMiddleware) {
+	r.Handle("/api/register",
+		authRateLimit.Limit(http.HandlerFunc(userHandler.Signup)),
+	).Methods("POST")
+
+	r.Handle("/api/login",
+		strictRateLimit.Limit(http.HandlerFunc(userHandler.Login)),
+	).Methods("POST")
+
 	r.Handle(
 		"/api/me",
 		authMiddleware.Authenticate(
-			http.HandlerFunc(userHandler.Me),
+			readRateLimit.Limit(
+				http.HandlerFunc(userHandler.Me),
+			),
 		),
 	).Methods("GET")
 }

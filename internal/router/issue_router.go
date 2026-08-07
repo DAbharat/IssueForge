@@ -8,49 +8,71 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func registerIssueRoutes(r *mux.Router, issueHandler *handler.IssueHandler, authMiddleware *middleware.AuthMiddleware) {
+func registerIssueRoutes(r *mux.Router, issueHandler *handler.IssueHandler, authMiddleware *middleware.AuthMiddleware, createRateLimit, readRateLimit, deleteRateLimit, patchRateLimit *middleware.RateLimitMiddleware) {
 	r.Handle("/api/projects/{projectID}/issues",
-		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.CreateIssue)),
+		authMiddleware.Authenticate(
+			createRateLimit.Limit(http.HandlerFunc(issueHandler.CreateIssue)),
+		),
 	).Methods("POST")
 
 	r.Handle("/api/issues/{issueID}",
-		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.GetIssueByID)),
+		authMiddleware.Authenticate(
+			readRateLimit.Limit(http.HandlerFunc(issueHandler.GetIssueByID)),
+		),
 	).Methods("GET")
 
 	r.Handle("/api/projects/{projectID}/issues",
-		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.ListProjectIssues)),
+		authMiddleware.Authenticate(
+			readRateLimit.Limit(http.HandlerFunc(issueHandler.ListProjectIssues)),
+		),
 	).Methods("GET")
 
 	r.Handle("/api/issues/{issueID}/details",
-		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.UpdateIssueDetails)),
+		authMiddleware.Authenticate(
+			patchRateLimit.Limit(http.HandlerFunc(issueHandler.UpdateIssueDetails)),
+		),
 	).Methods("PATCH")
 
 	r.Handle("/api/issues/{issueID}/status",
-		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.UpdateIssueStatus)),
+		authMiddleware.Authenticate(
+			patchRateLimit.Limit(http.HandlerFunc(issueHandler.UpdateIssueStatus)),
+		),
 	).Methods("PATCH")
 
 	r.Handle("/api/issues/{issueID}/assignee",
-		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.UpdateIssueAssignee)),
+		authMiddleware.Authenticate(
+			patchRateLimit.Limit(http.HandlerFunc(issueHandler.UpdateIssueAssignee)),
+		),
 	).Methods("PATCH")
 
 	r.Handle("/api/issues/{issueID}/priority",
-		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.UpdateIssuePriority)),
+		authMiddleware.Authenticate(
+			patchRateLimit.Limit(http.HandlerFunc(issueHandler.UpdateIssuePriority)),
+		),
 	).Methods("PATCH")
 
 	r.Handle("/api/users/me/issues/assigned",
-		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.ListAssignedIssues)),
+		authMiddleware.Authenticate(
+			readRateLimit.Limit(http.HandlerFunc(issueHandler.ListAssignedIssues)),
+		),
 	).Methods("GET")
 
 	r.Handle("/api/users/me/issues/created",
-		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.ListCreatedIssues)),
+		authMiddleware.Authenticate(
+			readRateLimit.Limit(http.HandlerFunc(issueHandler.ListCreatedIssues)),
+		),
 	).Methods("GET")
 
 	r.Handle("/api/issues/{issueID}/due-date",
-		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.UpdateIssueDueDate)),
+		authMiddleware.Authenticate(
+			patchRateLimit.Limit(http.HandlerFunc(issueHandler.UpdateIssueDueDate)),
+		),
 	).Methods("PATCH")
 
 	r.Handle("/api/issues/{issueID}",
-		authMiddleware.Authenticate(http.HandlerFunc(issueHandler.DeleteIssue)),
+		authMiddleware.Authenticate(
+			deleteRateLimit.Limit(http.HandlerFunc(issueHandler.DeleteIssue)),
+		),
 	).Methods("DELETE")
 
 	r.Handle("/api/issues/{issueID}/restore",
