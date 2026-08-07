@@ -108,4 +108,4 @@ WHERE id = $1 AND deleted_at IS NULL;
 UPDATE issues
 SET deleted_at = NULL
 WHERE id = $1 AND deleted_at IS NOT NULL
-RETURNING id;
+RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at, deleted_at, due_date;

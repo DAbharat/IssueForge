@@ -3,10 +3,12 @@ package service
 import (
 	"IssueForge/internal/db/sqlc"
 	"IssueForge/internal/dto"
+	"IssueForge/internal/redis"
 	"IssueForge/internal/repository"
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -24,7 +26,7 @@ type IssueRepo interface {
 	ListAssignedIssues(ctx context.Context, assignedTo int64) ([]sqlc.ListAssignedIssuesRow, error)
 	ListCreatedIssues(ctx context.Context, createdBy int64) ([]sqlc.ListCreatedIssuesRow, error)
 	DeleteIssue(ctx context.Context, issueID int64) (int64, error)
-	RestoreDeletedIssue(ctx context.Context, issueID int64) (int64, error)
+	RestoreDeletedIssue(ctx context.Context, issueID int64) (sqlc.Issue, error)
 }
 
 type ActivityService interface {
@@ -33,13 +35,15 @@ type ActivityService interface {
 
 type IssueService struct {
 	repo         IssueRepo
+	issueCache   redis.IssueCache
 	activityRepo ActivityService
 	authz        AuthzService
 }
 
-func NewIssueService(repo IssueRepo, activity ActivityService, authz AuthzService) *IssueService {
+func NewIssueService(repo IssueRepo, issueCache redis.IssueCache, activity ActivityService, authz AuthzService) *IssueService {
 	return &IssueService{
 		repo:         repo,
+		issueCache:   issueCache,
 		activityRepo: activity,
 		authz:        authz,
 	}
@@ -53,6 +57,12 @@ func strPtrEqual(a, b *string) bool {
 		return false
 	default:
 		return *a == *b
+	}
+}
+
+func (s *IssueService) invalidateIssueCache(ctx context.Context, issueID int64) {
+	if err := s.issueCache.DeleteIssue(ctx, issueID); err != nil {
+		log.Printf("failed to invalidate issue cache: %v", err)
 	}
 }
 
@@ -136,6 +146,14 @@ func (s *IssueService) GetIssueByID(ctx context.Context, requesterID, issueID in
 		return dto.IssueResponse{}, ErrInvalidIssueID
 	}
 
+	cache, found, err := s.issueCache.GetIssue(ctx, issueID)
+	if err != nil {
+		log.Printf("redis get failed: %v", err)
+	}
+	if found {
+		return cache, nil
+	}
+
 	issue, err := s.repo.GetIssueByID(ctx, issueID)
 	if err != nil {
 		if errors.Is(err, repository.ErrIssueNotFound) {
@@ -162,7 +180,8 @@ func (s *IssueService) GetIssueByID(ctx context.Context, requesterID, issueID in
 	if issue.DueDate.Valid {
 		dueDate = &issue.DueDate.Time
 	}
-	return dto.IssueResponse{
+
+	response := dto.IssueResponse{
 		ID:           issueID,
 		ProjectID:    issue.ProjectID,
 		CreatedBy:    issue.CreatedBy,
@@ -176,7 +195,13 @@ func (s *IssueService) GetIssueByID(ctx context.Context, requesterID, issueID in
 		DueDate:      dueDate,
 		CreatedAt:    issue.CreatedAt.Time,
 		UpdatedAt:    issue.UpdatedAt.Time,
-	}, nil
+	}
+
+	if err := s.issueCache.SetIssue(ctx, response); err != nil {
+		log.Printf("redis set failed: %v", err)
+	}
+
+	return response, nil
 }
 
 func (s *IssueService) ListProjectIssues(ctx context.Context, requesterID, projectID int64, req dto.ListProjectIssuesRequest) ([]dto.IssueSummary, error) {
@@ -343,6 +368,9 @@ func (s *IssueService) UpdateIssueDetails(ctx context.Context, requesterID, issu
 	if issues.DueDate.Valid {
 		dueDate = &issues.DueDate.Time
 	}
+
+	s.invalidateIssueCache(ctx, issues.ID)
+
 	return dto.IssueResponse{
 		ID:           issues.ID,
 		ProjectID:    issues.ProjectID,
@@ -410,6 +438,9 @@ func (s *IssueService) UpdateIssueStatus(ctx context.Context, requesterID, issue
 	if issue.DueDate.Valid {
 		dueDate = &issue.DueDate.Time
 	}
+
+	s.invalidateIssueCache(ctx, issue.ID)
+
 	return dto.IssueResponse{
 		ID:           issue.ID,
 		ProjectID:    issue.ProjectID,
@@ -503,6 +534,9 @@ func (s *IssueService) UpdateIssueAssignee(ctx context.Context, requesterID, iss
 	if issue.DueDate.Valid {
 		dueDate = &issue.DueDate.Time
 	}
+
+	s.invalidateIssueCache(ctx, issue.ID)
+
 	return dto.IssueResponse{
 		ID:           issue.ID,
 		ProjectID:    issue.ProjectID,
@@ -573,6 +607,9 @@ func (s *IssueService) UpdateIssuePriority(ctx context.Context, requesterID, iss
 	if issue.DueDate.Valid {
 		dueDate = &issue.DueDate.Time
 	}
+
+	s.invalidateIssueCache(ctx, issue.ID)
+
 	return dto.IssueResponse{
 		ID:           issue.ID,
 		ProjectID:    issue.ProjectID,
@@ -654,6 +691,8 @@ func (s *IssueService) UpdateIssueDueDate(ctx context.Context, requesterID, issu
 	if issue.DueDate.Valid {
 		dueDate = &issue.DueDate.Time
 	}
+
+	s.invalidateIssueCache(ctx, issue.ID)
 
 	return dto.IssueResponse{
 		ID:           issue.ID,
@@ -761,6 +800,8 @@ func (s *IssueService) DeleteIssue(ctx context.Context, requesterID, issueID int
 		return 0, fmt.Errorf("delete issue: %w", err)
 	}
 
+	_ = s.issueCache.DeleteIssue(ctx, dbIssue.ID)
+
 	_, err = s.activityRepo.CreateActivity(ctx, dbIssue.ID, requesterID, "ISSUE_DELETED", nil, nil, nil)
 	if err != nil {
 		return 0, fmt.Errorf("create activity: %w", err)
@@ -768,37 +809,81 @@ func (s *IssueService) DeleteIssue(ctx context.Context, requesterID, issueID int
 	return id, nil
 }
 
-func (s *IssueService) RestoreDeletedIssue(ctx context.Context, requesterID, issueID int64) (int64, error) {
+func (s *IssueService) RestoreDeletedIssue(ctx context.Context, requesterID, issueID int64) (dto.IssueResponse, error) {
 	if issueID <= 0 {
-		return 0, ErrInvalidIssueID
+		return dto.IssueResponse{}, ErrInvalidIssueID
 	}
 
 	dbIssue, err := s.repo.GetIssueByID(ctx, issueID)
 	if err != nil {
 		if errors.Is(err, repository.ErrIssueNotFound) {
-			return 0, ErrIssueNotFound
+			return dto.IssueResponse{}, ErrIssueNotFound
 		}
-		return 0, fmt.Errorf("get issue by id(restore): %w", err)
+		return dto.IssueResponse{}, fmt.Errorf("get issue by id(restore): %w", err)
 	}
 
 	isCreator := requesterID == dbIssue.CreatedBy
 	isLead := s.authz.RequireProjectLead(ctx, dbIssue.ProjectID, requesterID) == nil
 
 	if !isCreator && !isLead {
-		return 0, ErrForbidden
+		return dto.IssueResponse{}, ErrForbidden
 	}
 
 	issue, err := s.repo.RestoreDeletedIssue(ctx, dbIssue.ID)
 	if err != nil {
 		if errors.Is(err, repository.ErrIssueNotFound) {
-			return 0, ErrIssueNotFound
+			return dto.IssueResponse{}, ErrIssueNotFound
 		}
-		return 0, fmt.Errorf("restore deleted issue: %w", err)
+		return dto.IssueResponse{}, fmt.Errorf("restore deleted issue: %w", err)
 	}
+
+	s.invalidateIssueCache(ctx, dbIssue.ID)
 
 	_, err = s.activityRepo.CreateActivity(ctx, dbIssue.ID, requesterID, "ISSUE_RESTORED", nil, nil, nil)
 	if err != nil {
-		return 0, fmt.Errorf("create activity: %w", err)
+		return dto.IssueResponse{}, fmt.Errorf("create activity: %w", err)
 	}
-	return issue, nil
+
+	newIssue, err := s.repo.GetIssueByID(ctx, issue.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrIssueNotFound) {
+			return dto.IssueResponse{}, ErrIssueNotFound
+		}
+		return dto.IssueResponse{}, fmt.Errorf("get issue by id: %w", err)
+	}
+
+	var assignee *int64
+	if newIssue.AssignedTo.Valid {
+		assignee = &newIssue.AssignedTo.Int64
+	}
+	var dueDate *time.Time
+	if newIssue.DueDate.Valid {
+		dueDate = &newIssue.DueDate.Time
+	}
+	var assigneeName *string
+	if newIssue.AssigneeName.Valid {
+		assigneeName = &newIssue.AssigneeName.String
+	}
+
+	response := dto.IssueResponse{
+		ID:           newIssue.ID,
+		ProjectID:    newIssue.ProjectID,
+		CreatedBy:    newIssue.CreatedBy,
+		CreatorName:  newIssue.CreatorName,
+		AssignedTo:   assignee,
+		AssigneeName: assigneeName,
+		Title:        newIssue.Title,
+		Description:  newIssue.Description,
+		Status:       string(newIssue.Status),
+		Priority:     string(newIssue.Priority),
+		DueDate:      dueDate,
+		CreatedAt:    newIssue.CreatedAt.Time,
+		UpdatedAt:    newIssue.UpdatedAt.Time,
+	}
+
+	if err := s.issueCache.SetIssue(ctx, response); err != nil {
+		log.Printf("redis set failed: %v", err)
+	}
+
+	return response, nil
 }

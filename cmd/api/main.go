@@ -53,6 +53,7 @@ func main() {
 	}
 	projectCache := redis.NewRedisProjectCache(redisClient, cfg.RedisTTL)
 	workspaceCache := redis.NewRedisWorkspaceCache(redisClient, cfg.RedisTTL)
+	issueCache := redis.NewIssueCache(redisClient, cfg.RedisTTL)
 
 	cld, err := cloudinary.NewFromParams(
 		cfg.CloudinaryCloudName,
@@ -94,7 +95,7 @@ func main() {
 	issueActivityRepo := repository.NewIssueActivityRepository(queries)
 	issueActivityService := service.NewIssueActivityService(issueActivityRepo, issueRepo, authzService)
 
-	issueService := service.NewIssueService(issueRepo, issueActivityService, authzService)
+	issueService := service.NewIssueService(issueRepo, issueCache, issueActivityService, authzService)
 	issueHandler := handler.NewIssueHandler(issueService)
 
 	commentRepo := repository.NewCommentRepository(queries)

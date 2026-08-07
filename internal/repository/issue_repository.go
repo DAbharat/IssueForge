@@ -263,13 +263,13 @@ func (r *IssueRepository) GetIssueProjectID(ctx context.Context, id int64) (int6
 	return projectID, nil
 }
 
-func (r *IssueRepository) RestoreDeletedIssue(ctx context.Context, id int64) (int64, error) {
+func (r *IssueRepository) RestoreDeletedIssue(ctx context.Context, id int64) (sqlc.Issue, error) {
 	issue, err := r.queries.RestoreIssue(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return 0, ErrIssueNotFound
+			return sqlc.Issue{}, ErrIssueNotFound
 		}
-		return 0, fmt.Errorf("restore deleted issue: %w", err)
+		return sqlc.Issue{}, fmt.Errorf("restore deleted issue: %w", err)
 	}
 	return issue, nil
 }

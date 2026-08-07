@@ -28,7 +28,7 @@ type IssueService interface {
 	ListAssignedIssues(ctx context.Context, requesterID, assignedTo int64) ([]dto.UserIssueSummary, error)
 	ListCreatedIssues(ctx context.Context, requesterID, createdBy int64) ([]dto.UserIssueSummary, error)
 	DeleteIssue(ctx context.Context, requesterID, issueID int64) (int64, error)
-	RestoreDeletedIssue(ctx context.Context, requesterID, issueID int64) (int64, error)
+	RestoreDeletedIssue(ctx context.Context, requesterID, issueID int64) (dto.IssueResponse, error)
 }
 
 type IssueHandler struct {

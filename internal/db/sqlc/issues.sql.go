@@ -328,14 +328,27 @@ const restoreIssue = `-- name: RestoreIssue :one
 UPDATE issues
 SET deleted_at = NULL
 WHERE id = $1 AND deleted_at IS NOT NULL
-RETURNING id
+RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at, deleted_at, due_date
 `
 
-func (q *Queries) RestoreIssue(ctx context.Context, id int64) (int64, error) {
+func (q *Queries) RestoreIssue(ctx context.Context, id int64) (Issue, error) {
 	row := q.db.QueryRow(ctx, restoreIssue, id)
-	var id_2 int64
-	err := row.Scan(&id_2)
-	return id_2, err
+	var i Issue
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.CreatedBy,
+		&i.AssignedTo,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.Priority,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.DueDate,
+	)
+	return i, err
 }
 
 const updateIssueAssignee = `-- name: UpdateIssueAssignee :one

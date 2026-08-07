@@ -60,7 +60,7 @@ type Querier interface {
 	RemoveLabelFromIssue(ctx context.Context, arg RemoveLabelFromIssueParams) (int64, error)
 	RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) (RemoveWorkspaceMemberRow, error)
 	RestoreDeletedWorkspace(ctx context.Context, id int64) (RestoreDeletedWorkspaceRow, error)
-	RestoreIssue(ctx context.Context, id int64) (int64, error)
+	RestoreIssue(ctx context.Context, id int64) (Issue, error)
 	SafeAddMemberToProject(ctx context.Context, arg SafeAddMemberToProjectParams) (ProjectMember, error)
 	SoftDeleteAttachment(ctx context.Context, id int64) (SoftDeleteAttachmentRow, error)
 	UpdateComment(ctx context.Context, arg UpdateCommentParams) (Comment, error)
