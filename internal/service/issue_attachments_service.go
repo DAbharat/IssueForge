@@ -3,6 +3,7 @@ package service
 import (
 	"IssueForge/internal/db/sqlc"
 	"IssueForge/internal/dto"
+	"IssueForge/internal/redis/queue"
 	"IssueForge/internal/repository"
 	"IssueForge/internal/storage"
 	"context"
@@ -27,15 +28,17 @@ type IssueAttachmentService struct {
 	issueLookupRepo IssueLookupRepo
 	commentRepo     CommentRepo
 	storage         storage.Storage
+	deleteQueue     queue.AttachmentDeleteQueue
 	authz           AuthzService
 }
 
-func NewIssueAttachmentsService(repo IssueAttachmentRepo, issueLookupRepo IssueLookupRepo, commentRepo CommentRepo, storage storage.Storage, authz AuthzService) *IssueAttachmentService {
+func NewIssueAttachmentsService(repo IssueAttachmentRepo, issueLookupRepo IssueLookupRepo, commentRepo CommentRepo, storage storage.Storage, deleteQueue queue.AttachmentDeleteQueue, authz AuthzService) *IssueAttachmentService {
 	return &IssueAttachmentService{
 		repo:            repo,
 		issueLookupRepo: issueLookupRepo,
 		commentRepo:     commentRepo,
 		storage:         storage,
+		deleteQueue:     deleteQueue,
 		authz:           authz,
 	}
 }
@@ -309,12 +312,16 @@ func (s *IssueAttachmentService) SoftDeleteAttachments(ctx context.Context, requ
 		return 0, fmt.Errorf("soft delete attachment: %w", err)
 	}
 
-	err = s.storage.Delete(ctx, dbAttachment.StorageKey, dbAttachment.ResourceType)
-	if err != nil {
-		if errors.Is(err, storage.ErrDeleteFailed) {
-			return 0, ErrDeleteFailed
-		}
-		return 0, fmt.Errorf("delete cloudinary: %w", err)
+	job := queue.AttachmentDeleteJob{
+		AttachmentID: attachment.ID,
+		IssueID:      dbAttachment.IssueID,
+		UserID:       requesterID,
+		FilePublicID: attachment.StorageKey,
+		ResourceType: attachment.ResourceType,
+	}
+
+	if err := s.deleteQueue.AddDeleteJob(ctx, job); err != nil {
+		return 0, fmt.Errorf("enqueue attachment deletion: %w", err)
 	}
 
 	return attachment.ID, nil

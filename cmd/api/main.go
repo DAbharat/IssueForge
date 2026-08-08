@@ -8,6 +8,7 @@ import (
 	"IssueForge/internal/middleware"
 	"IssueForge/internal/redis"
 	"IssueForge/internal/redis/cache"
+	"IssueForge/internal/redis/queue"
 	"IssueForge/internal/redis/ratelimit"
 	"IssueForge/internal/repository"
 	"IssueForge/internal/router"
@@ -78,6 +79,12 @@ func main() {
 		log.Fatalf("initialize cloudinary: %v", err)
 	}
 
+	attachmentDeleteQueue, err := queue.NewAttachmentDeleteQueue(redisClient)
+	if err != nil {
+		log.Fatalf("initialize attachment queue: %v", err)
+	}
+	defer attachmentDeleteQueue.Close()
+
 	queries := sqlc.New(pool)
 
 	userRepo := repository.NewUserRepository(queries)
@@ -121,7 +128,7 @@ func main() {
 	cloudStorage := storage.NewCloudinaryStorage(cld)
 
 	issueAttachmentsRepo := repository.NewIssueAttachmentsRepository(queries)
-	issueAttachmentsService := service.NewIssueAttachmentsService(issueAttachmentsRepo, issueRepo, commentRepo, cloudStorage, authzService)
+	issueAttachmentsService := service.NewIssueAttachmentsService(issueAttachmentsRepo, issueRepo, commentRepo, cloudStorage, attachmentDeleteQueue, authzService)
 	issueAttachmentsHandler := handler.NewIssueAttachmentsHandler(issueAttachmentsService)
 
 	labelsRepo := repository.NewLabelsRepository(queries)
