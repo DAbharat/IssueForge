@@ -7,6 +7,8 @@ import (
 	"IssueForge/internal/handler"
 	"IssueForge/internal/middleware"
 	"IssueForge/internal/redis"
+	"IssueForge/internal/redis/cache"
+	"IssueForge/internal/redis/ratelimit"
 	"IssueForge/internal/repository"
 	"IssueForge/internal/router"
 	"IssueForge/internal/service"
@@ -51,11 +53,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("load redis: %v", err)
 	}
-	projectCache := redis.NewRedisProjectCache(redisClient, cfg.RedisTTL)
-	workspaceCache := redis.NewRedisWorkspaceCache(redisClient, cfg.RedisTTL)
-	issueCache := redis.NewIssueCache(redisClient, cfg.RedisTTL)
+	projectCache := cache.NewRedisProjectCache(redisClient, cfg.RedisTTL)
+	workspaceCache := cache.NewRedisWorkspaceCache(redisClient, cfg.RedisTTL)
+	issueCache := cache.NewIssueCache(redisClient, cfg.RedisTTL)
 
-	rateLimiter := redis.NewRateLimiter(redisClient, true)
+	rateLimiter := ratelimit.NewRateLimiter(redisClient, true)
 
 	strictRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 5, 5.0/60)
 	authRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 3, 3.0/60)

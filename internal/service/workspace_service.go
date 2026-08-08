@@ -3,7 +3,7 @@ package service
 import (
 	"IssueForge/internal/db/sqlc"
 	"IssueForge/internal/dto"
-	"IssueForge/internal/redis"
+	"IssueForge/internal/redis/cache"
 	"IssueForge/internal/repository"
 	"context"
 	"errors"
@@ -28,12 +28,12 @@ type WorkspaceMemRepo interface {
 
 type WorkspaceService struct {
 	repo                WorkspaceRepo
-	workspaceCache      redis.WorkspaceCache
+	workspaceCache      cache.WorkspaceCache
 	authz               AuthzService
 	workspaceMemberRepo WorkspaceMemRepo
 }
 
-func NewWorkspaceService(repo WorkspaceRepo, workspaceCache redis.WorkspaceCache, workspaceMemRepo WorkspaceMemRepo, authz AuthzService) *WorkspaceService {
+func NewWorkspaceService(repo WorkspaceRepo, workspaceCache cache.WorkspaceCache, workspaceMemRepo WorkspaceMemRepo, authz AuthzService) *WorkspaceService {
 	return &WorkspaceService{
 		repo:                repo,
 		workspaceCache:      workspaceCache,

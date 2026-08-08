@@ -1,4 +1,4 @@
-package redis
+package ratelimit
 
 import (
 	"context"

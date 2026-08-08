@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"IssueForge/internal/httpx"
-	"IssueForge/internal/redis"
+	"IssueForge/internal/redis/ratelimit"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,12 +11,12 @@ import (
 )
 
 type RateLimitMiddleware struct {
-	limiter    *redis.RateLimiter
+	limiter    *ratelimit.RateLimiter
 	capacity   int
 	refillRate float64
 }
 
-func NewRateLimitMiddleware(limiter *redis.RateLimiter, capacity int, refillRate float64) *RateLimitMiddleware {
+func NewRateLimitMiddleware(limiter *ratelimit.RateLimiter, capacity int, refillRate float64) *RateLimitMiddleware {
 	return &RateLimitMiddleware{
 		limiter:    limiter,
 		capacity:   capacity,

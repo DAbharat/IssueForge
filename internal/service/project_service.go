@@ -3,7 +3,7 @@ package service
 import (
 	"IssueForge/internal/db/sqlc"
 	"IssueForge/internal/dto"
-	"IssueForge/internal/redis"
+	"IssueForge/internal/redis/cache"
 	"IssueForge/internal/repository"
 	"context"
 	"errors"
@@ -24,11 +24,11 @@ type ProjectRepo interface {
 
 type ProjectService struct {
 	projectRepo  ProjectRepo
-	projectCache redis.ProjectCache
+	projectCache cache.ProjectCache
 	authz        AuthzService
 }
 
-func NewProjectService(repo ProjectRepo, projectCache redis.ProjectCache, authz AuthzService) *ProjectService {
+func NewProjectService(repo ProjectRepo, projectCache cache.ProjectCache, authz AuthzService) *ProjectService {
 	return &ProjectService{
 		projectRepo:  repo,
 		projectCache: projectCache,

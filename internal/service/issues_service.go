@@ -3,7 +3,7 @@ package service
 import (
 	"IssueForge/internal/db/sqlc"
 	"IssueForge/internal/dto"
-	"IssueForge/internal/redis"
+	"IssueForge/internal/redis/cache"
 	"IssueForge/internal/repository"
 	"context"
 	"errors"
@@ -35,12 +35,12 @@ type ActivityService interface {
 
 type IssueService struct {
 	repo         IssueRepo
-	issueCache   redis.IssueCache
+	issueCache   cache.IssueCache
 	activityRepo ActivityService
 	authz        AuthzService
 }
 
-func NewIssueService(repo IssueRepo, issueCache redis.IssueCache, activity ActivityService, authz AuthzService) *IssueService {
+func NewIssueService(repo IssueRepo, issueCache cache.IssueCache, activity ActivityService, authz AuthzService) *IssueService {
 	return &IssueService{
 		repo:         repo,
 		issueCache:   issueCache,
