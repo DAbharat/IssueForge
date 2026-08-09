@@ -20,8 +20,13 @@ type LoginUserRequest struct {
 }
 
 type LoginUserResponse struct {
-	AccessToken string     `json:"access_token"`
-	User        MeResponse `json:"user"`
+	AccessToken  string     `json:"access_token"`
+	RefreshToken string     `json:"refresh_token"`
+	User         MeResponse `json:"user"`
+}
+
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token"`
 }
 
 type WorkspaceSummary struct {

@@ -17,6 +17,7 @@ var (
 	ErrProjectMemberAlreadyExists    = errors.New("member already exists in this project")
 	ErrProjectNotFound               = errors.New("project not found")
 	ErrUserNotFound                  = errors.New("user not found")
+	ErrDuplicateEmail                = errors.New("email already exists")
 	ErrProjectMemberValidationFailed = errors.New("cannot add user in this project")
 	ErrUserNotProjectMember          = errors.New("user is not the member of this project")
 	ErrWorkspaceMemberAlreadyExists  = errors.New("member already exists in this workspace")
@@ -57,4 +58,5 @@ var (
 	ErrLabelNotFound                 = errors.New("label not found")
 	ErrLabelDoesNotBelongToProject   = errors.New("label does not belong to project")
 	ErrLabelNotAttached              = errors.New("label not attached")
+	ErrRefTokenNotFound              = errors.New("refresh token not found")
 )

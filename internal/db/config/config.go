@@ -23,11 +23,12 @@ type Config struct {
 	RedisPassword       string
 	RedisDB             int
 	RedisTTL            time.Duration
+	RefreshTokenTTL     time.Duration
 }
 
 func Load() (*Config, error) {
 
-	requiredEnvVars := []string{"DB_HOST", "DB_PASSWORD", "DB_USER", "DB_PORT", "DB_NAME", "JWTSecret", "CLOUDINARY_URL", "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "REDIS_ADDR", "REDIS_DB", "REDIS_TTL"}
+	requiredEnvVars := []string{"DB_HOST", "DB_PASSWORD", "DB_USER", "DB_PORT", "DB_NAME", "JWTSecret", "CLOUDINARY_URL", "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "REDIS_ADDR", "REDIS_DB", "REDIS_TTL", "REFRESH_TOKEN_TTL"}
 	missingVars := checkMissingENV(requiredEnvVars)
 
 	if len(missingVars) > 0 {
@@ -37,6 +38,7 @@ func Load() (*Config, error) {
 	port, err := strconv.Atoi(os.Getenv("DB_PORT"))
 	redisDB, redErr := strconv.Atoi(os.Getenv("REDIS_DB"))
 	redisTTL, redTTLErr := time.ParseDuration(os.Getenv("REDIS_TTL"))
+	refreshTokenTTL, refreshTokenTTLErr := time.ParseDuration(os.Getenv("REFRESH_TOKEN_TTL"))
 
 	if err != nil {
 		return nil, fmt.Errorf("invalid DB_PORT: %w", err)
@@ -46,6 +48,9 @@ func Load() (*Config, error) {
 	}
 	if redTTLErr != nil {
 		return nil, fmt.Errorf("invalid REDIS_TTL: %w", err)
+	}
+	if refreshTokenTTLErr != nil {
+		return nil, fmt.Errorf("invalid REFRESH_TOKEN_TTL: %w", err)
 	}
 
 	cfg := &Config{
@@ -63,6 +68,7 @@ func Load() (*Config, error) {
 		RedisPassword:       os.Getenv("REDIS_PASSWORD"),
 		RedisDB:             redisDB,
 		RedisTTL:            redisTTL,
+		RefreshTokenTTL:     refreshTokenTTL,
 	}
 	if cfg.JWTSecret == "" {
 		return &Config{}, errors.New("JWTSecret is required")

@@ -4,6 +4,7 @@ import (
 	"IssueForge/internal/auth"
 	"IssueForge/internal/db/sqlc"
 	"IssueForge/internal/dto"
+	"IssueForge/internal/redis/refreshtoken"
 	"IssueForge/internal/repository"
 	"context"
 	"errors"
@@ -33,13 +34,15 @@ type UserService struct {
 	userRepo            UserRepo
 	workspaceMemberRepo WorkspaceMemberRepo
 	jwtSecret           string
+	refreshToken        *refreshtoken.Store
 }
 
-func NewUserService(userRepo UserRepo, workspaceMemberRepo WorkspaceMemberRepo, jwtSecret string) *UserService {
+func NewUserService(userRepo UserRepo, workspaceMemberRepo WorkspaceMemberRepo, jwtSecret string, refreshToken *refreshtoken.Store) *UserService {
 	return &UserService{
 		userRepo:            userRepo,
 		workspaceMemberRepo: workspaceMemberRepo,
 		jwtSecret:           jwtSecret,
+		refreshToken:        refreshToken,
 	}
 }
 
@@ -101,7 +104,7 @@ func (s *UserService) CreateUser(ctx context.Context, req dto.CreateUserRequest)
 	user, err := s.userRepo.CreateUser(ctx, req.Email, req.DisplayName, req.Fullname, string(hashedPassword))
 	if err != nil {
 		if errors.Is(err, repository.ErrDuplicateEmail) {
-			return dto.CreateUserResponse{}, err
+			return dto.CreateUserResponse{}, ErrDuplicateEmail
 		}
 		return dto.CreateUserResponse{}, fmt.Errorf("create user: %w", err)
 	}
@@ -146,6 +149,15 @@ func (s *UserService) Login(ctx context.Context, req dto.LoginUserRequest) (dto.
 	if err != nil {
 		return dto.LoginUserResponse{}, fmt.Errorf("generate jwt: %w", err)
 	}
+	refToken, err := auth.GenerateRefToken()
+	if err != nil {
+		return dto.LoginUserResponse{}, fmt.Errorf("generate refresh token: %w", err)
+	}
+
+	err = s.refreshToken.CreateRefreshToken(ctx, refToken, user.ID)
+	if err != nil {
+		return dto.LoginUserResponse{}, fmt.Errorf("create refresh token: %w", err)
+	}
 
 	workspaces, err := s.workspaceMemberRepo.ListUserWorkspaces(ctx, user.ID, "")
 	if err != nil {
@@ -153,7 +165,8 @@ func (s *UserService) Login(ctx context.Context, req dto.LoginUserRequest) (dto.
 	}
 
 	return dto.LoginUserResponse{
-		AccessToken: token,
+		AccessToken:  token,
+		RefreshToken: refToken,
 		User: dto.MeResponse{
 			ID:          user.ID,
 			DisplayName: user.DisplayName,
@@ -195,4 +208,21 @@ func (s *UserService) mapWorkspaces(workspaces []sqlc.ListUserWorkspacesRow) []d
 		})
 	}
 	return workspaceSummaries
+}
+
+func (s *UserService) RefreshAccessToken(ctx context.Context, req dto.RefreshTokenRequest) (string, error) {
+	userID, err := s.refreshToken.GetRefreshToken(ctx, req.RefreshToken)
+	if err != nil {
+		if errors.Is(err, refreshtoken.ErrTokenNotFound) {
+			return "", ErrRefTokenNotFound
+		}
+		return "", fmt.Errorf("get refresh token: %w", err)
+	}
+
+	genNewToken, err := auth.GenerateToken(userID, s.jwtSecret)
+	if err != nil {
+		return "", fmt.Errorf("failed to genrate access token: %w", err)
+	}
+
+	return genNewToken, nil
 }

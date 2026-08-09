@@ -17,6 +17,10 @@ func registerUserRoutes(r *mux.Router, userHandler *handler.UserHandler, authMid
 		strictRateLimit.Limit(http.HandlerFunc(userHandler.Login)),
 	).Methods("POST")
 
+	r.Handle("/api/auth/refresh",
+		authRateLimit.Limit(http.HandlerFunc(userHandler.RefreshAccessToken)),
+	).Methods("POST")
+
 	r.Handle(
 		"/api/me",
 		authMiddleware.Authenticate(

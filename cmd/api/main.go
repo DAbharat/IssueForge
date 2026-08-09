@@ -10,6 +10,7 @@ import (
 	"IssueForge/internal/redis/cache"
 	"IssueForge/internal/redis/queue"
 	"IssueForge/internal/redis/ratelimit"
+	"IssueForge/internal/redis/refreshtoken"
 	"IssueForge/internal/repository"
 	"IssueForge/internal/router"
 	"IssueForge/internal/service"
@@ -101,11 +102,13 @@ func main() {
 		}
 	}()
 
+	refreshToken := refreshtoken.NewStore(redisClient, cfg.RefreshTokenTTL)
+
 	queries := sqlc.New(pool)
 
 	userRepo := repository.NewUserRepository(queries)
 	workspaceMemberRepo := repository.NewWorkspaceMemberRepository(queries)
-	userService := service.NewUserService(userRepo, workspaceMemberRepo, cfg.JWTSecret)
+	userService := service.NewUserService(userRepo, workspaceMemberRepo, cfg.JWTSecret, refreshToken)
 	userHandler := handler.NewUserHandler(userService)
 
 	authzRepo := repository.NewAuthorizationRepository(queries)

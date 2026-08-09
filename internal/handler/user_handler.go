@@ -18,6 +18,7 @@ type UserService interface {
 	CreateUser(ctx context.Context, req dto.CreateUserRequest) (dto.CreateUserResponse, error)
 	Login(ctx context.Context, req dto.LoginUserRequest) (dto.LoginUserResponse, error)
 	GetCurrentUser(ctx context.Context, userID int64) (dto.MeResponse, error)
+	RefreshAccessToken(ctx context.Context, req dto.RefreshTokenRequest) (string, error)
 }
 
 type UserHandler struct {
@@ -114,4 +115,41 @@ func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.RespondWithJSON(w, http.StatusOK, user)
+}
+
+func (h *UserHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request) {
+	var req dto.RefreshTokenRequest
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, "invalid or oversized request body")
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		httpx.RespondWithError(w, http.StatusBadRequest, "request body must only contain a single json object")
+		return
+	}
+
+	if req.RefreshToken == "" {
+		httpx.RespondWithError(w, http.StatusBadRequest, "invalid token")
+		return
+	}
+
+	accessToken, err := h.userService.RefreshAccessToken(r.Context(), req)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrRefTokenNotFound):
+			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
+		default:
+			log.Printf("refresh access token fail: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+	httpx.RespondWithJSON(w, http.StatusOK, map[string]string{
+		"accessToken": accessToken,
+	})
 }
