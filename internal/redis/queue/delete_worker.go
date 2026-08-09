@@ -15,7 +15,7 @@ func NewAttachmentDeleteWorker(client redis.Cmdable, storage storage.Storage) (*
 		data := job.Data()
 
 		log.Printf(
-			"processing attachment deletion: attachment%d issue=%d publicID-%s",
+			"processing attachment deletion: attachment%d issue=%d publicID=%s",
 			data.AttachmentID,
 			data.IssueID,
 			data.FilePublicID,

@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"mime/multipart"
 	"path/filepath"
 
@@ -103,7 +104,16 @@ func (s *IssueAttachmentService) CreateAttachment(ctx context.Context, requester
 
 	attachment, err := s.repo.CreateAttachment(ctx, issueID, commentID, requesterID, header.Filename, uploadResult.StorageKey, uploadResult.ResourceType, uploadResult.MIMEType, uploadResult.Size)
 	if err != nil {
-		_ = s.storage.Delete(ctx, uploadResult.StorageKey, uploadResult.ResourceType)
+		job := queue.AttachmentDeleteJob{
+			IssueID:      issueID,
+			UserID:       requesterID,
+			FilePublicID: uploadResult.StorageKey,
+			ResourceType: uploadResult.ResourceType,
+		}
+		if err := s.deleteQueue.AddDeleteJob(ctx, job); err != nil {
+			log.Printf("attachment delete job fail: %v", err)
+		}
+
 		switch {
 		case errors.Is(err, repository.ErrIssueNotFound):
 			return dto.AttachmentResponse{}, ErrIssueNotFound

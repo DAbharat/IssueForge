@@ -8,7 +8,7 @@ import (
 	"go.codycody31.dev/gobullmq"
 )
 
-const AttachmentDeleteQueueName = "attachment-delete"
+const AttachmentDeleteQueueName = "attachment-delete" //queuename
 
 type AttachmentDeleteQueue interface {
 	AddDeleteJob(ctx context.Context, job AttachmentDeleteJob) error
@@ -33,11 +33,15 @@ func NewAttachmentDeleteQueue(client redis.Cmdable) (*AttachmentDeleteQueueImpl,
 	}, nil
 }
 
-func (q *AttachmentDeleteQueueImpl) AddDeleteJob(ctx context.Context, job AttachmentDeleteJob) error {
-	_, err := q.queue.Add(ctx, "delete-attachment", job)
+func (q *AttachmentDeleteQueueImpl) AddDeleteJob(ctx context.Context, job AttachmentDeleteJob) error { //jobname
+	_, err := q.queue.Add(ctx, "delete-attachment", job, gobullmq.AddWithAttempts(3), gobullmq.AddWithBackoff(gobullmq.BackoffOptions{
+		Type:  "exponential",
+		Delay: 1000,
+	}))
 	if err != nil {
 		return fmt.Errorf("add attachment delete job: %w", err)
 	}
+
 	return nil
 }
 

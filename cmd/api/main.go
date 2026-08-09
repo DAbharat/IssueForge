@@ -79,11 +79,27 @@ func main() {
 		log.Fatalf("initialize cloudinary: %v", err)
 	}
 
+	cloudStorage := storage.NewCloudinaryStorage(cld)
+
 	attachmentDeleteQueue, err := queue.NewAttachmentDeleteQueue(redisClient)
 	if err != nil {
 		log.Fatalf("initialize attachment queue: %v", err)
 	}
 	defer attachmentDeleteQueue.Close()
+
+	attachmentDeleteWorker, err := queue.NewAttachmentDeleteWorker(redisClient, cloudStorage)
+	if err != nil {
+		log.Fatalf("initialize attachment delete worker: %v", err)
+	}
+
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+
+	go func() {
+		if err := attachmentDeleteWorker.Run(workerCtx); err != nil {
+			log.Printf("attachment delete worker stopped: %v", err)
+		}
+	}()
 
 	queries := sqlc.New(pool)
 
@@ -124,8 +140,6 @@ func main() {
 	commentHandler := handler.NewCommentHandler(commentService)
 
 	issueActivityHandler := handler.NewIssueActivityHandler(issueActivityService)
-
-	cloudStorage := storage.NewCloudinaryStorage(cld)
 
 	issueAttachmentsRepo := repository.NewIssueAttachmentsRepository(queries)
 	issueAttachmentsService := service.NewIssueAttachmentsService(issueAttachmentsRepo, issueRepo, commentRepo, cloudStorage, attachmentDeleteQueue, authzService)
@@ -185,6 +199,8 @@ func main() {
 
 	sig := <-shutdownChan
 	log.Printf("received signal for shutdown %v", sig)
+
+	workerCancel()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
