@@ -5,6 +5,7 @@ import (
 	"IssueForge/internal/middleware"
 
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func New(userHandler *handler.UserHandler,
@@ -18,6 +19,7 @@ func New(userHandler *handler.UserHandler,
 	issueAttachmentsHandler *handler.IssueAttachmentsHandler,
 	labelsHandler *handler.LabelsHandler,
 	authMiddleware *middleware.AuthMiddleware,
+	reg *prometheus.Registry,
 	strictRateLimit *middleware.RateLimitMiddleware,
 	authRateLimit *middleware.RateLimitMiddleware,
 	readRateLimit *middleware.RateLimitMiddleware,
@@ -31,7 +33,7 @@ func New(userHandler *handler.UserHandler,
 
 	r := mux.NewRouter()
 
-	registerHealthRoutes(r)
+	registerHealthRoutes(r, reg)
 	registerUserRoutes(r, userHandler, authMiddleware, strictRateLimit, authRateLimit, readRateLimit)
 	registerProjectRoutes(r, projectHandler, authMiddleware, readRateLimit, createRateLimit, patchRateLimit)
 	registerProjectMembersRoutes(r, projectMemberHandler, authMiddleware, readRateLimit)
@@ -42,6 +44,9 @@ func New(userHandler *handler.UserHandler,
 	registerIssueActivityRouter(r, issueActivityHandler, authMiddleware)
 	registerIssueAttachmentsRoutes(r, issueAttachmentsHandler, authMiddleware, attachmentRateLimit, readRateLimit)
 	registerLabelsRoutes(r, labelsHandler, authMiddleware)
+
+	metrics := middleware.NewMetricsMiddleware(reg)
+	r.Use(metrics.Metrics)
 
 	return r
 }

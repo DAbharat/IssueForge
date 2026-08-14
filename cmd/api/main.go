@@ -27,6 +27,8 @@ import (
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/gorilla/handlers"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 )
 
 func main() {
@@ -104,6 +106,12 @@ func main() {
 
 	refreshToken := refreshtoken.NewStore(redisClient, cfg.RefreshTokenTTL)
 
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(collectors.NewGoCollector())
+	reg.MustRegister(collectors.NewProcessCollector(
+		collectors.ProcessCollectorOpts{},
+	))
+
 	queries := sqlc.New(pool)
 
 	userRepo := repository.NewUserRepository(queries)
@@ -163,6 +171,7 @@ func main() {
 		issueAttachmentsHandler,
 		labelsHandler,
 		authMiddleware,
+		reg,
 		strictRateLimit,
 		authRateLimit,
 		readRateLimit,
