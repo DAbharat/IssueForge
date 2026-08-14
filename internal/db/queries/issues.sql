@@ -15,7 +15,7 @@ RETURNING id, project_id, created_by, assigned_to, title, description, status, p
 
 
 -- name: GetIssueByID :one
-SELECT i.id, i.project_id, i.created_by, i.assigned_to, i.title, i.description, i.status, i.priority, i.created_at, i.updated_at, i.due_date, creator.display_name AS creator_name, assignee.display_name AS assignee_name, deleted_at
+SELECT i.id, i.project_id, i.created_by, i.assigned_to, i.title, i.description, i.status, i.priority, i.created_at, i.updated_at, i.due_date, creator.fullname AS creator_name, creator.username AS creator_username, assignee.fullname AS assignee_name, assignee.username AS assignee_username, i.deleted_at
 FROM issues i
 JOIN users creator ON i.created_by = creator.id
 LEFT JOIN users assignee ON i.assigned_to = assignee.id
@@ -24,8 +24,8 @@ WHERE i.id = $1 AND i.deleted_at IS NULL;
 
 -- name: ListProjectIssues :many
 SELECT i.id, i.project_id, i.title, i.status, i.priority, i.created_at, i.assigned_to, i.created_by, i.deleted_at, i.due_date,
-       u_creator.display_name AS creator_name,
-       u_assignee.display_name AS assignee_name
+       u_creator.fullname AS creator_name, u_creator.username AS creator_username,
+       u_assignee.fullname AS assignee_name, u_assignee.username AS assignee_username
 FROM issues i
 INNER JOIN users u_creator ON i.created_by = u_creator.id
 LEFT JOIN users u_assignee ON i.assigned_to = u_assignee.id

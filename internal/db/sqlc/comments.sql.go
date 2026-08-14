@@ -65,7 +65,7 @@ func (q *Queries) DeleteComment(ctx context.Context, id int64) (int64, error) {
 }
 
 const getCommentByID = `-- name: GetCommentByID :one
-SELECT c.id, c.issue_id, c.author_id, u.display_name as author_name, c.parent_comment_id, c.content, c.is_edited, c.created_at, c.updated_at
+SELECT c.id, c.issue_id, c.author_id, u.fullname as author_name, u.username as author_username, c.parent_comment_id, c.content, c.is_edited, c.created_at, c.updated_at
 FROM comments c
 JOIN users u ON c.author_id = u.id
 WHERE c.id = $1
@@ -76,6 +76,7 @@ type GetCommentByIDRow struct {
 	IssueID         int64              `json:"issue_id"`
 	AuthorID        int64              `json:"author_id"`
 	AuthorName      string             `json:"author_name"`
+	AuthorUsername  string             `json:"author_username"`
 	ParentCommentID pgtype.Int8        `json:"parent_comment_id"`
 	Content         string             `json:"content"`
 	IsEdited        bool               `json:"is_edited"`
@@ -91,6 +92,7 @@ func (q *Queries) GetCommentByID(ctx context.Context, id int64) (GetCommentByIDR
 		&i.IssueID,
 		&i.AuthorID,
 		&i.AuthorName,
+		&i.AuthorUsername,
 		&i.ParentCommentID,
 		&i.Content,
 		&i.IsEdited,
@@ -101,7 +103,7 @@ func (q *Queries) GetCommentByID(ctx context.Context, id int64) (GetCommentByIDR
 }
 
 const listIssueComments = `-- name: ListIssueComments :many
-SELECT c.id, c.issue_id, c.author_id, u.display_name as author_name, c.parent_comment_id, c.content, c.is_edited, c.created_at, c.updated_at
+SELECT c.id, c.issue_id, c.author_id, u.fullname as author_name, u.username as author_username, c.parent_comment_id, c.content, c.is_edited, c.created_at, c.updated_at
 FROM comments c
 JOIN users u
 ON c.author_id = u.id
@@ -121,6 +123,7 @@ type ListIssueCommentsRow struct {
 	IssueID         int64              `json:"issue_id"`
 	AuthorID        int64              `json:"author_id"`
 	AuthorName      string             `json:"author_name"`
+	AuthorUsername  string             `json:"author_username"`
 	ParentCommentID pgtype.Int8        `json:"parent_comment_id"`
 	Content         string             `json:"content"`
 	IsEdited        bool               `json:"is_edited"`
@@ -142,6 +145,7 @@ func (q *Queries) ListIssueComments(ctx context.Context, arg ListIssueCommentsPa
 			&i.IssueID,
 			&i.AuthorID,
 			&i.AuthorName,
+			&i.AuthorUsername,
 			&i.ParentCommentID,
 			&i.Content,
 			&i.IsEdited,

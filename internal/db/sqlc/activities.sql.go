@@ -59,7 +59,7 @@ func (q *Queries) CreateActivity(ctx context.Context, arg CreateActivityParams) 
 
 const listIssueActivities = `-- name: ListIssueActivities :many
 SELECT ia.id, ia.issue_id, ia.actor_id, ia.activity_type, ia.field_name, ia.old_value, ia.new_value, ia.created_at,
-       u_actor.display_name AS actor_name
+       u_actor.fullname AS actor_name, u_actor.username AS actor_username
 FROM issue_activities ia
 INNER JOIN users u_actor ON ia.actor_id = u_actor.id
 INNER JOIN issues i ON ia.issue_id = i.id
@@ -76,15 +76,16 @@ type ListIssueActivitiesParams struct {
 }
 
 type ListIssueActivitiesRow struct {
-	ID           int64              `json:"id"`
-	IssueID      int64              `json:"issue_id"`
-	ActorID      int64              `json:"actor_id"`
-	ActivityType ActivityType       `json:"activity_type"`
-	FieldName    pgtype.Text        `json:"field_name"`
-	OldValue     pgtype.Text        `json:"old_value"`
-	NewValue     pgtype.Text        `json:"new_value"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	ActorName    string             `json:"actor_name"`
+	ID            int64              `json:"id"`
+	IssueID       int64              `json:"issue_id"`
+	ActorID       int64              `json:"actor_id"`
+	ActivityType  ActivityType       `json:"activity_type"`
+	FieldName     pgtype.Text        `json:"field_name"`
+	OldValue      pgtype.Text        `json:"old_value"`
+	NewValue      pgtype.Text        `json:"new_value"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	ActorName     string             `json:"actor_name"`
+	ActorUsername string             `json:"actor_username"`
 }
 
 func (q *Queries) ListIssueActivities(ctx context.Context, arg ListIssueActivitiesParams) ([]ListIssueActivitiesRow, error) {
@@ -106,6 +107,7 @@ func (q *Queries) ListIssueActivities(ctx context.Context, arg ListIssueActiviti
 			&i.NewValue,
 			&i.CreatedAt,
 			&i.ActorName,
+			&i.ActorUsername,
 		); err != nil {
 			return nil, err
 		}

@@ -55,7 +55,7 @@ func (q *Queries) IsProjectMember(ctx context.Context, arg IsProjectMemberParams
 }
 
 const listProjectMembers = `-- name: ListProjectMembers :many
-SELECT u.id, u.email, u.fullname, u.display_name, pm.joined_at
+SELECT u.id, u.email, u.fullname, u.fullname, u.username, pm.joined_at
 FROM project_members pm
 JOIN users u ON pm.user_id = u.id
 WHERE pm.project_id = $1
@@ -63,11 +63,12 @@ ORDER BY pm.joined_at ASC
 `
 
 type ListProjectMembersRow struct {
-	ID          int64              `json:"id"`
-	Email       string             `json:"email"`
-	Fullname    string             `json:"fullname"`
-	DisplayName string             `json:"display_name"`
-	JoinedAt    pgtype.Timestamptz `json:"joined_at"`
+	ID         int64              `json:"id"`
+	Email      string             `json:"email"`
+	Fullname   string             `json:"fullname"`
+	Fullname_2 string             `json:"fullname_2"`
+	Username   string             `json:"username"`
+	JoinedAt   pgtype.Timestamptz `json:"joined_at"`
 }
 
 func (q *Queries) ListProjectMembers(ctx context.Context, projectID int64) ([]ListProjectMembersRow, error) {
@@ -83,7 +84,8 @@ func (q *Queries) ListProjectMembers(ctx context.Context, projectID int64) ([]Li
 			&i.ID,
 			&i.Email,
 			&i.Fullname,
-			&i.DisplayName,
+			&i.Fullname_2,
+			&i.Username,
 			&i.JoinedAt,
 		); err != nil {
 			return nil, err

@@ -16,7 +16,7 @@ RETURNING id, issue_id, comment_id, uploaded_by, original_name, storage_key, res
 
 -- name: GetAttachmentByID :one
 SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.created_at, ia.deleted_at,
-    uploader.display_name AS uploader_name
+    uploader.fullname AS uploader_name, uploader.username AS uploader_username
 FROM issue_attachments ia
 JOIN users uploader ON ia.uploaded_by = uploader.id
 WHERE ia.id = $1 AND ia.deleted_at IS NULL;
@@ -24,7 +24,7 @@ WHERE ia.id = $1 AND ia.deleted_at IS NULL;
 
 -- name: ListIssueAttachments :many
 SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.created_at,
-    uploader.display_name AS uploader_name
+    uploader.fullname AS uploader_name, uploader.username AS uploader_username
 FROM issue_attachments ia
 JOIN users uploader ON ia.uploaded_by = uploader.id
 WHERE ia.issue_id = $1 AND ia.deleted_at IS NULL
@@ -33,7 +33,7 @@ ORDER BY ia.created_at ASC;
 
 -- name: ListCommentAttachments :many
 SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.created_at,
-    uploader.display_name AS uploader_name
+    uploader.fullname AS uploader_name, uploader.username AS uploader_username
 FROM issue_attachments ia
 JOIN users uploader ON ia.uploaded_by = uploader.id
 WHERE ia.comment_id = $1 AND ia.deleted_at IS NULL

@@ -2,24 +2,40 @@
 INSERT INTO users(
     email,
     fullname,
-    display_name,
+    username,
     password_hash
 )
 VALUES(
     $1, $2, $3, $4
 )
-RETURNING id, email, fullname, display_name, created_at;
+RETURNING id, email, fullname, username, created_at;
 
 
 -- name: GetUserForLogin :one
-SELECT id, email, display_name, fullname, password_hash
+SELECT id, email, username, fullname, password_hash
 FROM users
-WHERE email = $1
+WHERE email = $1 AND deleted_at IS NULL
 LIMIT 1;
 
 
 -- name: GetUserByID :one
-SELECT id, display_name, fullname, email, created_at, updated_at
+SELECT id, username, fullname, email, created_at, updated_at
 FROM users
-WHERE id=$1
+WHERE id = $1 AND deleted_at IS NULL
+LIMIT 1;
+
+
+-- name: SearchUserByUsername :many
+SELECT id, username, fullname
+FROM users
+WHERE username ILIKE '%' || sqlc.arg(search) || '%'
+  AND deleted_at IS NULL
+ORDER BY username
+LIMIT 10;
+
+
+-- name: GetUserByUsername :one
+SELECT id, username, fullname
+FROM users
+WHERE username = sqlc.arg(username) AND deleted_at IS NULL
 LIMIT 1;

@@ -32,7 +32,7 @@ RETURNING project_id, user_id, joined_at;
 
 
 -- name: ListProjectMembers :many
-SELECT u.id, u.email, u.fullname, u.display_name, pm.joined_at
+SELECT u.id, u.email, u.fullname, u.fullname, u.username, pm.joined_at
 FROM project_members pm
 JOIN users u ON pm.user_id = u.id
 WHERE pm.project_id = $1

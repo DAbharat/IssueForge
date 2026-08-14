@@ -68,25 +68,26 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 
 const getAttachmentByID = `-- name: GetAttachmentByID :one
 SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.created_at, ia.deleted_at,
-    uploader.display_name AS uploader_name
+    uploader.fullname AS uploader_name, uploader.username AS uploader_username
 FROM issue_attachments ia
 JOIN users uploader ON ia.uploaded_by = uploader.id
 WHERE ia.id = $1 AND ia.deleted_at IS NULL
 `
 
 type GetAttachmentByIDRow struct {
-	ID           int64              `json:"id"`
-	IssueID      int64              `json:"issue_id"`
-	CommentID    pgtype.Int8        `json:"comment_id"`
-	UploadedBy   int64              `json:"uploaded_by"`
-	OriginalName string             `json:"original_name"`
-	StorageKey   string             `json:"storage_key"`
-	ResourceType string             `json:"resource_type"`
-	MimeType     string             `json:"mime_type"`
-	FileSize     int64              `json:"file_size"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
-	UploaderName string             `json:"uploader_name"`
+	ID               int64              `json:"id"`
+	IssueID          int64              `json:"issue_id"`
+	CommentID        pgtype.Int8        `json:"comment_id"`
+	UploadedBy       int64              `json:"uploaded_by"`
+	OriginalName     string             `json:"original_name"`
+	StorageKey       string             `json:"storage_key"`
+	ResourceType     string             `json:"resource_type"`
+	MimeType         string             `json:"mime_type"`
+	FileSize         int64              `json:"file_size"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
+	UploaderName     string             `json:"uploader_name"`
+	UploaderUsername string             `json:"uploader_username"`
 }
 
 func (q *Queries) GetAttachmentByID(ctx context.Context, id int64) (GetAttachmentByIDRow, error) {
@@ -105,13 +106,14 @@ func (q *Queries) GetAttachmentByID(ctx context.Context, id int64) (GetAttachmen
 		&i.CreatedAt,
 		&i.DeletedAt,
 		&i.UploaderName,
+		&i.UploaderUsername,
 	)
 	return i, err
 }
 
 const listCommentAttachments = `-- name: ListCommentAttachments :many
 SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.created_at,
-    uploader.display_name AS uploader_name
+    uploader.fullname AS uploader_name, uploader.username AS uploader_username
 FROM issue_attachments ia
 JOIN users uploader ON ia.uploaded_by = uploader.id
 WHERE ia.comment_id = $1 AND ia.deleted_at IS NULL
@@ -119,17 +121,18 @@ ORDER BY ia.created_at ASC
 `
 
 type ListCommentAttachmentsRow struct {
-	ID           int64              `json:"id"`
-	IssueID      int64              `json:"issue_id"`
-	CommentID    pgtype.Int8        `json:"comment_id"`
-	UploadedBy   int64              `json:"uploaded_by"`
-	OriginalName string             `json:"original_name"`
-	StorageKey   string             `json:"storage_key"`
-	ResourceType string             `json:"resource_type"`
-	MimeType     string             `json:"mime_type"`
-	FileSize     int64              `json:"file_size"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UploaderName string             `json:"uploader_name"`
+	ID               int64              `json:"id"`
+	IssueID          int64              `json:"issue_id"`
+	CommentID        pgtype.Int8        `json:"comment_id"`
+	UploadedBy       int64              `json:"uploaded_by"`
+	OriginalName     string             `json:"original_name"`
+	StorageKey       string             `json:"storage_key"`
+	ResourceType     string             `json:"resource_type"`
+	MimeType         string             `json:"mime_type"`
+	FileSize         int64              `json:"file_size"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UploaderName     string             `json:"uploader_name"`
+	UploaderUsername string             `json:"uploader_username"`
 }
 
 func (q *Queries) ListCommentAttachments(ctx context.Context, commentID pgtype.Int8) ([]ListCommentAttachmentsRow, error) {
@@ -153,6 +156,7 @@ func (q *Queries) ListCommentAttachments(ctx context.Context, commentID pgtype.I
 			&i.FileSize,
 			&i.CreatedAt,
 			&i.UploaderName,
+			&i.UploaderUsername,
 		); err != nil {
 			return nil, err
 		}
@@ -166,7 +170,7 @@ func (q *Queries) ListCommentAttachments(ctx context.Context, commentID pgtype.I
 
 const listIssueAttachments = `-- name: ListIssueAttachments :many
 SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.created_at,
-    uploader.display_name AS uploader_name
+    uploader.fullname AS uploader_name, uploader.username AS uploader_username
 FROM issue_attachments ia
 JOIN users uploader ON ia.uploaded_by = uploader.id
 WHERE ia.issue_id = $1 AND ia.deleted_at IS NULL
@@ -174,17 +178,18 @@ ORDER BY ia.created_at ASC
 `
 
 type ListIssueAttachmentsRow struct {
-	ID           int64              `json:"id"`
-	IssueID      int64              `json:"issue_id"`
-	CommentID    pgtype.Int8        `json:"comment_id"`
-	UploadedBy   int64              `json:"uploaded_by"`
-	OriginalName string             `json:"original_name"`
-	StorageKey   string             `json:"storage_key"`
-	ResourceType string             `json:"resource_type"`
-	MimeType     string             `json:"mime_type"`
-	FileSize     int64              `json:"file_size"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UploaderName string             `json:"uploader_name"`
+	ID               int64              `json:"id"`
+	IssueID          int64              `json:"issue_id"`
+	CommentID        pgtype.Int8        `json:"comment_id"`
+	UploadedBy       int64              `json:"uploaded_by"`
+	OriginalName     string             `json:"original_name"`
+	StorageKey       string             `json:"storage_key"`
+	ResourceType     string             `json:"resource_type"`
+	MimeType         string             `json:"mime_type"`
+	FileSize         int64              `json:"file_size"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UploaderName     string             `json:"uploader_name"`
+	UploaderUsername string             `json:"uploader_username"`
 }
 
 func (q *Queries) ListIssueAttachments(ctx context.Context, issueID int64) ([]ListIssueAttachmentsRow, error) {
@@ -208,6 +213,7 @@ func (q *Queries) ListIssueAttachments(ctx context.Context, issueID int64) ([]Li
 			&i.FileSize,
 			&i.CreatedAt,
 			&i.UploaderName,
+			&i.UploaderUsername,
 		); err != nil {
 			return nil, err
 		}
