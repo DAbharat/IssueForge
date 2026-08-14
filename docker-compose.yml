@@ -7,6 +7,14 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    container_name: issueforge-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
       
   redis:
     image: redis:7-alpine
@@ -20,3 +28,4 @@ services:
 
 volumes:
   redis_data:
+  grafana_data:
