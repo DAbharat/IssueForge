@@ -34,7 +34,7 @@ func New(userHandler *handler.UserHandler,
 	r := mux.NewRouter()
 
 	registerHealthRoutes(r, reg)
-	registerUserRoutes(r, userHandler, authMiddleware, strictRateLimit, authRateLimit, readRateLimit)
+	registerUserRoutes(r, userHandler, authMiddleware, strictRateLimit, authRateLimit, readRateLimit, deleteRateLimit)
 	registerProjectRoutes(r, projectHandler, authMiddleware, readRateLimit, createRateLimit, patchRateLimit)
 	registerProjectMembersRoutes(r, projectMemberHandler, authMiddleware, readRateLimit)
 	registerWorkspaceRoutes(r, workspaceHandler, authMiddleware, readRateLimit, createRateLimit, patchRateLimit)

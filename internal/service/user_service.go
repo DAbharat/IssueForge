@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"log"
 	"net/mail"
+	"regexp"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -24,6 +26,9 @@ type UserRepo interface {
 	CreateUser(ctx context.Context, email, displayName, fullname, passwordHash string) (sqlc.CreateOnboardingUserRow, error)
 	GetUserForLogin(ctx context.Context, email string) (sqlc.GetUserForLoginRow, error)
 	GetUserByID(ctx context.Context, id int64) (sqlc.GetUserByIDRow, error)
+	GetUserByUsername(ctx context.Context, username string) (sqlc.GetUserByUsernameRow, error)
+	SearchUserByUsername(ctx context.Context, search *string) ([]sqlc.SearchUserByUsernameRow, error)
+	DeleteUser(ctx context.Context, id int64) (int64, error)
 }
 
 type WorkspaceMemberRepo interface {
@@ -44,6 +49,12 @@ func NewUserService(userRepo UserRepo, workspaceMemberRepo WorkspaceMemberRepo, 
 		jwtSecret:           jwtSecret,
 		refreshToken:        refreshToken,
 	}
+}
+
+func isValidUsername(username string) bool {
+	pattern := `^[a-z0-9_.]+$`
+	matched, _ := regexp.MatchString(pattern, username)
+	return matched
 }
 
 func validatePasswordComplexity(password string) bool {
@@ -75,11 +86,17 @@ func (s *UserService) validateCreateUser(req dto.CreateUserRequest) error {
 	if len(req.Password) < 8 || len(req.Password) > 72 {
 		return ErrInvalidPassword
 	}
+	if !isValidUsername(req.Username) {
+		return ErrInvalidUsername
+	}
 	if !validatePasswordComplexity(req.Password) {
 		return ErrInvalidPassword
 	}
 	if utf8.RuneCountInString(req.Fullname) < 3 {
 		return ErrInvalidFullName
+	}
+	if utf8.RuneCountInString(req.Username) < 3 || utf8.RuneCountInString(req.Username) > 30 {
+		return ErrInvalidUsername
 	}
 	if _, err := mail.ParseAddress(req.Email); err != nil {
 		return ErrInvalidEmail
@@ -101,19 +118,22 @@ func (s *UserService) CreateUser(ctx context.Context, req dto.CreateUserRequest)
 		return dto.CreateUserResponse{}, fmt.Errorf("hash password failed: %w", err)
 	}
 
-	user, err := s.userRepo.CreateUser(ctx, req.Email, req.DisplayName, req.Fullname, string(hashedPassword))
+	user, err := s.userRepo.CreateUser(ctx, req.Email, req.Username, req.Fullname, string(hashedPassword))
 	if err != nil {
 		if errors.Is(err, repository.ErrDuplicateEmail) {
 			return dto.CreateUserResponse{}, ErrDuplicateEmail
+		}
+		if errors.Is(err, repository.ErrDuplicateUsername) {
+			return dto.CreateUserResponse{}, ErrDuplicateUsername
 		}
 		return dto.CreateUserResponse{}, fmt.Errorf("create user: %w", err)
 	}
 
 	return dto.CreateUserResponse{
-		ID:          user.ID,
-		DisplayName: user.DisplayName,
-		Fullname:    user.Fullname,
-		Email:       user.Email,
+		ID:       user.ID,
+		Username: user.Username,
+		Fullname: user.Fullname,
+		Email:    user.Email,
 	}, nil
 }
 
@@ -168,11 +188,11 @@ func (s *UserService) Login(ctx context.Context, req dto.LoginUserRequest) (dto.
 		AccessToken:  token,
 		RefreshToken: refToken,
 		User: dto.MeResponse{
-			ID:          user.ID,
-			DisplayName: user.DisplayName,
-			Fullname:    user.Fullname,
-			Email:       user.Email,
-			Workspaces:  s.mapWorkspaces(workspaces),
+			ID:         user.ID,
+			Username:   user.Username,
+			Fullname:   user.Fullname,
+			Email:      user.Email,
+			Workspaces: s.mapWorkspaces(workspaces),
 		},
 	}, nil
 }
@@ -190,11 +210,11 @@ func (s *UserService) GetCurrentUser(ctx context.Context, userID int64) (dto.MeR
 	log.Printf("%+v", workspaces)
 
 	return dto.MeResponse{
-		ID:          user.ID,
-		DisplayName: user.DisplayName,
-		Fullname:    user.Fullname,
-		Email:       user.Email,
-		Workspaces:  s.mapWorkspaces(workspaces),
+		ID:         user.ID,
+		Username:   user.Username,
+		Fullname:   user.Fullname,
+		Email:      user.Email,
+		Workspaces: s.mapWorkspaces(workspaces),
 	}, nil
 }
 
@@ -225,4 +245,96 @@ func (s *UserService) RefreshAccessToken(ctx context.Context, req dto.RefreshTok
 	}
 
 	return genNewToken, nil
+}
+
+func (s *UserService) GetUserByID(ctx context.Context, id int64) (dto.UserResponse, error) {
+	if id < 0 {
+		return dto.UserResponse{}, ErrInvalidUserID
+	}
+
+	user, err := s.userRepo.GetUserByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return dto.UserResponse{}, ErrUserNotFound
+		}
+		return dto.UserResponse{}, fmt.Errorf("get user by id: %w", err)
+	}
+	return dto.UserResponse{
+		ID:        user.ID,
+		Username:  user.Username,
+		Fullname:  user.Fullname,
+		CreatedAt: user.CreatedAt.Time,
+		UpdatedAt: user.UpdatedAt.Time,
+	}, nil
+}
+
+func (s *UserService) GetUserByUsername(ctx context.Context, username string) (dto.UserResponse, error) {
+	username = strings.TrimSpace(username)
+
+	if username == "" {
+		return dto.UserResponse{}, ErrInvalidUsername
+	}
+
+	user, err := s.userRepo.GetUserByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return dto.UserResponse{}, ErrUserNotFound
+		}
+		return dto.UserResponse{}, fmt.Errorf("get user by username: %w", err)
+	}
+	return dto.UserResponse{
+		ID:        user.ID,
+		Username:  user.Username,
+		Fullname:  user.Fullname,
+		CreatedAt: user.CreatedAt.Time,
+		UpdatedAt: user.UpdatedAt.Time,
+	}, nil
+}
+
+func (s *UserService) SearchUserByUsername(ctx context.Context, search *string) ([]dto.UserResponse, error) {
+	newSearch := ""
+
+	if search != nil {
+		newSearch = *search
+	}
+
+	if newSearch == "" {
+		search = nil
+	} else {
+		if utf8.RuneCountInString(newSearch) > 50 {
+			return nil, ErrInvalidSearchQuery
+		}
+		search = &newSearch
+	}
+
+	dbUser, err := s.userRepo.SearchUserByUsername(ctx, search)
+	if err != nil {
+		return nil, fmt.Errorf("search user by username: %w", err)
+	}
+
+	user := make([]dto.UserResponse, 0, len(dbUser))
+
+	for _, u := range dbUser {
+		user = append(user, dto.UserResponse{
+			ID:       u.ID,
+			Username: u.Username,
+			Fullname: u.Fullname,
+		})
+	}
+	return user, nil
+}
+
+func (s *UserService) DeleteUser(ctx context.Context, id int64) (int64, error) {
+	if id < 0 {
+		return 0, ErrInvalidUserID
+	}
+
+	userID, err := s.userRepo.DeleteUser(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return 0, ErrUserNotFound
+		}
+		return 0, fmt.Errorf("delete user: %w", err)
+	}
+	return userID, nil
 }

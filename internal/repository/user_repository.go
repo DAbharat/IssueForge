@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type UserRepository struct {
@@ -36,6 +37,8 @@ func (r *UserRepository) CreateUser(ctx context.Context, email, username, fullNa
 				switch pgErr.ConstraintName {
 				case "users_email_key":
 					return sqlc.CreateOnboardingUserRow{}, ErrDuplicateEmail
+				case "users_username_key":
+					return sqlc.CreateOnboardingUserRow{}, ErrDuplicateUsername
 				}
 			}
 		}
@@ -65,4 +68,40 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id int64) (sqlc.GetUse
 		return sqlc.GetUserByIDRow{}, fmt.Errorf("get user by id: %w", err)
 	}
 	return user, nil
+}
+
+func (r *UserRepository) GetUserByUsername(ctx context.Context, username string) (sqlc.GetUserByUsernameRow, error) {
+	user, err := r.queries.GetUserByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.GetUserByUsernameRow{}, ErrUserNotFound
+		}
+		return sqlc.GetUserByUsernameRow{}, fmt.Errorf("get user by username: %w", err)
+	}
+	return user, nil
+}
+
+func (r *UserRepository) SearchUserByUsername(ctx context.Context, search *string) ([]sqlc.SearchUserByUsernameRow, error) {
+	var newSearch pgtype.Text
+	if search != nil {
+		newSearch.String = *search
+		newSearch.Valid = true
+	}
+
+	user, err := r.queries.SearchUserByUsername(ctx, newSearch)
+	if err != nil {
+		return nil, fmt.Errorf("search user by username: %w", err)
+	}
+	return user, nil
+}
+
+func (r *UserRepository) DeleteUser(ctx context.Context, id int64) (int64, error) {
+	id, err := r.queries.DeleteUser(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, ErrUserNotFound
+		}
+		return 0, fmt.Errorf("delete user: %w", err)
+	}
+	return id, nil
 }

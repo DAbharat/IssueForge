@@ -62,11 +62,11 @@ func (s *ProjectMemberService) ListProjectMembers(ctx context.Context, projectID
 
 	for _, member := range members {
 		result = append(result, dto.ProjectMemberSummary{
-			ID:          member.ID,
-			Email:       member.Email,
-			Fullname:    member.Fullname,
-			DisplayName: member.DisplayName,
-			JoinedAt:    member.JoinedAt.Time,
+			ID:       member.ID,
+			Email:    member.Email,
+			Fullname: member.Fullname,
+			Username: member.Username,
+			JoinedAt: member.JoinedAt.Time,
 		})
 	}
 	return result, nil

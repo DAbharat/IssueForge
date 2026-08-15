@@ -6,6 +6,8 @@ var (
 	ErrInvalidPassword               = errors.New("password must be atleast 8 and atmost 72 characters, containing uppercase, lowercase, numeric and special character")
 	ErrInvalidFullName               = errors.New("name must be more than 3 characters")
 	ErrInvalidEmail                  = errors.New("email is invalid")
+	ErrInvalidUsername               = errors.New("username must be atleast 3 and atmost 30 characters")
+	ErrDuplicateUsername             = errors.New("username already exists")
 	ErrInvalidCredentials            = errors.New("invalid credentials")
 	ErrInvalidProjectName            = errors.New("project name must be between 3 and 100 characters")
 	ErrInvalidDescription            = errors.New("description must be between 10 and 300 characters")

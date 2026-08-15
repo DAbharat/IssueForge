@@ -35,7 +35,14 @@ LIMIT 10;
 
 
 -- name: GetUserByUsername :one
-SELECT id, username, fullname
+SELECT id, username, fullname, email, created_at, updated_at
 FROM users
 WHERE username = sqlc.arg(username) AND deleted_at IS NULL
 LIMIT 1;
+
+
+-- name: DeleteUser :one
+UPDATE users
+SET deleted_at = NOW()
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id;

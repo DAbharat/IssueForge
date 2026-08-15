@@ -57,6 +57,20 @@ func (q *Queries) CreateOnboardingUser(ctx context.Context, arg CreateOnboarding
 	return i, err
 }
 
+const deleteUser = `-- name: DeleteUser :one
+UPDATE users
+SET deleted_at = NOW()
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id
+`
+
+func (q *Queries) DeleteUser(ctx context.Context, id int64) (int64, error) {
+	row := q.db.QueryRow(ctx, deleteUser, id)
+	var id_2 int64
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
 const getUserByID = `-- name: GetUserByID :one
 SELECT id, username, fullname, email, created_at, updated_at
 FROM users
@@ -88,22 +102,32 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (GetUserByIDRow, er
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, fullname
+SELECT id, username, fullname, email, created_at, updated_at
 FROM users
 WHERE username = $1 AND deleted_at IS NULL
 LIMIT 1
 `
 
 type GetUserByUsernameRow struct {
-	ID       int64  `json:"id"`
-	Username string `json:"username"`
-	Fullname string `json:"fullname"`
+	ID        int64              `json:"id"`
+	Username  string             `json:"username"`
+	Fullname  string             `json:"fullname"`
+	Email     string             `json:"email"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error) {
 	row := q.db.QueryRow(ctx, getUserByUsername, username)
 	var i GetUserByUsernameRow
-	err := row.Scan(&i.ID, &i.Username, &i.Fullname)
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Fullname,
+		&i.Email,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
 	return i, err
 }
 

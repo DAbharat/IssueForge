@@ -27,6 +27,7 @@ type Querier interface {
 	DeleteIssue(ctx context.Context, id int64) (int64, error)
 	DeleteLabel(ctx context.Context, id int64) (DeleteLabelRow, error)
 	DeleteProject(ctx context.Context, id int64) (DeleteProjectRow, error)
+	DeleteUser(ctx context.Context, id int64) (int64, error)
 	DeleteWorkspace(ctx context.Context, id int64) (int64, error)
 	GetAttachmentByID(ctx context.Context, id int64) (GetAttachmentByIDRow, error)
 	GetCommentByID(ctx context.Context, id int64) (GetCommentByIDRow, error)
