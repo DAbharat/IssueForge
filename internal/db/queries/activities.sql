@@ -14,7 +14,7 @@ RETURNING id, issue_id, actor_id, activity_type, field_name, old_value, new_valu
 
 -- name: ListIssueActivities :many
 SELECT ia.id, ia.issue_id, ia.actor_id, ia.activity_type, ia.field_name, ia.old_value, ia.new_value, ia.created_at,
-       u_actor.display_name AS actor_name
+       u_actor.fullname AS actor_name, u_actor.username AS actor_username
 FROM issue_activities ia
 INNER JOIN users u_actor ON ia.actor_id = u_actor.id
 INNER JOIN issues i ON ia.issue_id = i.id

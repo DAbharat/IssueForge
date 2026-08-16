@@ -19,18 +19,18 @@ type WorkspaceMemberDetails struct {
 	UserID      int64     `json:"user_id"`
 	Email       string    `json:"email"`
 	Fullname    string    `json:"fullname"`
-	DisplayName string    `json:"display_name"`
+	Username    string    `json:"username"`
 	Role        string    `json:"role"`
 	JoinedAt    time.Time `json:"joined_at"`
 }
 
 type WorkspaceMemberSummary struct {
-	ID          int64     `json:"id"`
-	Fullname    string    `json:"fullname"`
-	DisplayName string    `json:"display_name"`
-	Email       string    `json:"email"`
-	Role        string    `json:"role"`
-	JoinedAt    time.Time `json:"joined_at"`
+	ID       int64     `json:"id"`
+	Fullname string    `json:"fullname"`
+	Username string    `json:"username"`
+	Email    string    `json:"email"`
+	Role     string    `json:"role"`
+	JoinedAt time.Time `json:"joined_at"`
 }
 
 type RemoveWorkspaceMemberResponse struct {

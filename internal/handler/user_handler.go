@@ -12,6 +12,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
+
+	"github.com/gorilla/mux"
 )
 
 type UserService interface {
@@ -19,6 +22,10 @@ type UserService interface {
 	Login(ctx context.Context, req dto.LoginUserRequest) (dto.LoginUserResponse, error)
 	GetCurrentUser(ctx context.Context, userID int64) (dto.MeResponse, error)
 	RefreshAccessToken(ctx context.Context, req dto.RefreshTokenRequest) (string, error)
+	GetUserByID(ctx context.Context, id int64) (dto.UserResponse, error)
+	GetUserByUsername(ctx context.Context, username string) (dto.UserResponse, error)
+	SearchUserByUsername(ctx context.Context, search *string) ([]dto.UserResponse, error)
+	DeleteUser(ctx context.Context, id int64) (int64, error)
 }
 
 type UserHandler struct {
@@ -152,4 +159,119 @@ func (h *UserHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request)
 	httpx.RespondWithJSON(w, http.StatusOK, map[string]string{
 		"accessToken": accessToken,
 	})
+}
+
+func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
+	_, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	vars := mux.Vars(r)
+
+	userID, err := strconv.ParseInt(vars["userID"], 10, 64)
+	if err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidUserID.Error())
+		return
+	}
+
+	user, err := h.userService.GetUserByID(r.Context(), userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidUserID):
+			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
+		case errors.Is(err, service.ErrUserNotFound):
+			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
+		default:
+			log.Printf("get user by id fail: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+	httpx.RespondWithJSON(w, http.StatusOK, user)
+}
+
+func (h *UserHandler) GetUserByUsername(w http.ResponseWriter, r *http.Request) {
+	_, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	username := mux.Vars(r)["username"]
+	if username == "" {
+		httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidUsername.Error())
+		return
+	}
+
+	user, err := h.userService.GetUserByUsername(r.Context(), username)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidUsername):
+			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
+		case errors.Is(err, service.ErrUserNotFound):
+			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
+		default:
+			log.Printf("get user by username: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+	httpx.RespondWithJSON(w, http.StatusOK, user)
+}
+
+func (h *UserHandler) SearchUserByUsername(w http.ResponseWriter, r *http.Request) {
+	_, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	search := r.URL.Query().Get("search")
+
+	var searchPtr *string
+	if search != "" {
+		searchPtr = &search
+	}
+
+	user, err := h.userService.SearchUserByUsername(r.Context(), searchPtr)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidSearchQuery):
+			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
+		default:
+			log.Printf("search user by username fail: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+	httpx.RespondWithJSON(w, http.StatusOK, user)
+}
+
+func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	_, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	vars := mux.Vars(r)
+
+	userID, err := strconv.ParseInt(vars["userID"], 10, 64)
+	if err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidUserID.Error())
+		return
+	}
+
+	user, err := h.userService.DeleteUser(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, service.ErrUserNotFound) {
+			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
+		}
+		log.Printf("delete user fail: %v", err)
+		httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	httpx.RespondWithJSON(w, http.StatusOK, user)
 }

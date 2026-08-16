@@ -11,7 +11,7 @@ RETURNING workspace_id, user_id, role, joined_at;
 
 
 -- name: GetWorkspaceMember :one
-SELECT wm.workspace_id, wm.user_id, wm.role, wm.joined_at, u.email, u.fullname, u.display_name
+SELECT wm.workspace_id, wm.user_id, wm.role, wm.joined_at, u.email, u.fullname, u.username
 FROM workspace_members wm
 JOIN users u ON wm.user_id = u.id
 JOIN workspaces w ON wm.workspace_id = w.id
@@ -21,7 +21,7 @@ AND w.deleted_at IS NULL;
 
 
 -- name: ListWorkspaceMembers :many
-SELECT u.id, u.fullname, u.display_name, u.email, wm.role, wm.joined_at
+SELECT u.id, u.fullname, u.username, u.email, wm.role, wm.joined_at
 FROM workspace_members wm
 JOIN users u ON wm.user_id = u.id
 JOIN workspaces w ON wm.workspace_id = w.id

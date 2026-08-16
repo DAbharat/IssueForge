@@ -13,9 +13,9 @@ type ProjectMemberResponse struct {
 }
 
 type ProjectMemberSummary struct {
-	ID          int64     `json:"id"`
-	Email       string    `json:"email"`
-	Fullname    string    `json:"fullname"`
-	DisplayName string    `json:"display_name"`
-	JoinedAt    time.Time `json:"joined_at"`
+	ID       int64     `json:"id"`
+	Email    string    `json:"email"`
+	Fullname string    `json:"fullname"`
+	Username string    `json:"username"`
+	JoinedAt time.Time `json:"joined_at"`
 }

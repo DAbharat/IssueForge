@@ -82,7 +82,7 @@ func (q *Queries) DeleteIssue(ctx context.Context, id int64) (int64, error) {
 }
 
 const getIssueByID = `-- name: GetIssueByID :one
-SELECT i.id, i.project_id, i.created_by, i.assigned_to, i.title, i.description, i.status, i.priority, i.created_at, i.updated_at, i.due_date, creator.display_name AS creator_name, assignee.display_name AS assignee_name, deleted_at
+SELECT i.id, i.project_id, i.created_by, i.assigned_to, i.title, i.description, i.status, i.priority, i.created_at, i.updated_at, i.due_date, creator.fullname AS creator_name, creator.username AS creator_username, assignee.fullname AS assignee_name, assignee.username AS assignee_username, i.deleted_at
 FROM issues i
 JOIN users creator ON i.created_by = creator.id
 LEFT JOIN users assignee ON i.assigned_to = assignee.id
@@ -90,20 +90,22 @@ WHERE i.id = $1 AND i.deleted_at IS NULL
 `
 
 type GetIssueByIDRow struct {
-	ID           int64              `json:"id"`
-	ProjectID    int64              `json:"project_id"`
-	CreatedBy    int64              `json:"created_by"`
-	AssignedTo   pgtype.Int8        `json:"assigned_to"`
-	Title        string             `json:"title"`
-	Description  string             `json:"description"`
-	Status       IssueStatus        `json:"status"`
-	Priority     IssuePriority      `json:"priority"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-	DueDate      pgtype.Timestamptz `json:"due_date"`
-	CreatorName  string             `json:"creator_name"`
-	AssigneeName pgtype.Text        `json:"assignee_name"`
-	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
+	ID               int64              `json:"id"`
+	ProjectID        int64              `json:"project_id"`
+	CreatedBy        int64              `json:"created_by"`
+	AssignedTo       pgtype.Int8        `json:"assigned_to"`
+	Title            string             `json:"title"`
+	Description      string             `json:"description"`
+	Status           IssueStatus        `json:"status"`
+	Priority         IssuePriority      `json:"priority"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	DueDate          pgtype.Timestamptz `json:"due_date"`
+	CreatorName      string             `json:"creator_name"`
+	CreatorUsername  string             `json:"creator_username"`
+	AssigneeName     pgtype.Text        `json:"assignee_name"`
+	AssigneeUsername pgtype.Text        `json:"assignee_username"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
 }
 
 func (q *Queries) GetIssueByID(ctx context.Context, id int64) (GetIssueByIDRow, error) {
@@ -122,7 +124,9 @@ func (q *Queries) GetIssueByID(ctx context.Context, id int64) (GetIssueByIDRow, 
 		&i.UpdatedAt,
 		&i.DueDate,
 		&i.CreatorName,
+		&i.CreatorUsername,
 		&i.AssigneeName,
+		&i.AssigneeUsername,
 		&i.DeletedAt,
 	)
 	return i, err
@@ -243,8 +247,8 @@ func (q *Queries) ListCreatedIssues(ctx context.Context, createdBy int64) ([]Lis
 
 const listProjectIssues = `-- name: ListProjectIssues :many
 SELECT i.id, i.project_id, i.title, i.status, i.priority, i.created_at, i.assigned_to, i.created_by, i.deleted_at, i.due_date,
-       u_creator.display_name AS creator_name,
-       u_assignee.display_name AS assignee_name
+       u_creator.fullname AS creator_name, u_creator.username AS creator_username,
+       u_assignee.fullname AS assignee_name, u_assignee.username AS assignee_username
 FROM issues i
 INNER JOIN users u_creator ON i.created_by = u_creator.id
 LEFT JOIN users u_assignee ON i.assigned_to = u_assignee.id
@@ -269,18 +273,20 @@ type ListProjectIssuesParams struct {
 }
 
 type ListProjectIssuesRow struct {
-	ID           int64              `json:"id"`
-	ProjectID    int64              `json:"project_id"`
-	Title        string             `json:"title"`
-	Status       IssueStatus        `json:"status"`
-	Priority     IssuePriority      `json:"priority"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	AssignedTo   pgtype.Int8        `json:"assigned_to"`
-	CreatedBy    int64              `json:"created_by"`
-	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
-	DueDate      pgtype.Timestamptz `json:"due_date"`
-	CreatorName  string             `json:"creator_name"`
-	AssigneeName pgtype.Text        `json:"assignee_name"`
+	ID               int64              `json:"id"`
+	ProjectID        int64              `json:"project_id"`
+	Title            string             `json:"title"`
+	Status           IssueStatus        `json:"status"`
+	Priority         IssuePriority      `json:"priority"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	AssignedTo       pgtype.Int8        `json:"assigned_to"`
+	CreatedBy        int64              `json:"created_by"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
+	DueDate          pgtype.Timestamptz `json:"due_date"`
+	CreatorName      string             `json:"creator_name"`
+	CreatorUsername  string             `json:"creator_username"`
+	AssigneeName     pgtype.Text        `json:"assignee_name"`
+	AssigneeUsername pgtype.Text        `json:"assignee_username"`
 }
 
 func (q *Queries) ListProjectIssues(ctx context.Context, arg ListProjectIssuesParams) ([]ListProjectIssuesRow, error) {
@@ -312,7 +318,9 @@ func (q *Queries) ListProjectIssues(ctx context.Context, arg ListProjectIssuesPa
 			&i.DeletedAt,
 			&i.DueDate,
 			&i.CreatorName,
+			&i.CreatorUsername,
 			&i.AssigneeName,
+			&i.AssigneeUsername,
 		); err != nil {
 			return nil, err
 		}

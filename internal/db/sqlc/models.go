@@ -278,11 +278,12 @@ type ProjectMember struct {
 type User struct {
 	ID           int64              `json:"id"`
 	Fullname     string             `json:"fullname"`
-	DisplayName  string             `json:"display_name"`
+	Username     string             `json:"username"`
 	Email        string             `json:"email"`
 	PasswordHash string             `json:"password_hash"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type Workspace struct {
@@ -291,6 +292,16 @@ type Workspace struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type WorkspaceInvitation struct {
+	ID            int64              `json:"id"`
+	WorkspaceID   int64              `json:"workspace_id"`
+	InvitedUserID int64              `json:"invited_user_id"`
+	InvitedBy     int64              `json:"invited_by"`
+	Status        string             `json:"status"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	RespondedAt   pgtype.Timestamptz `json:"responded_at"`
 }
 
 type WorkspaceMember struct {

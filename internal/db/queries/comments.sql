@@ -11,14 +11,14 @@ RETURNING id, issue_id, author_id, parent_comment_id, content, is_edited, create
 
 
 -- name: GetCommentByID :one
-SELECT c.id, c.issue_id, c.author_id, u.display_name as author_name, c.parent_comment_id, c.content, c.is_edited, c.created_at, c.updated_at
+SELECT c.id, c.issue_id, c.author_id, u.fullname as author_name, u.username as author_username, c.parent_comment_id, c.content, c.is_edited, c.created_at, c.updated_at
 FROM comments c
 JOIN users u ON c.author_id = u.id
 WHERE c.id = $1;
 
 
 -- name: ListIssueComments :many
-SELECT c.id, c.issue_id, c.author_id, u.display_name as author_name, c.parent_comment_id, c.content, c.is_edited, c.created_at, c.updated_at
+SELECT c.id, c.issue_id, c.author_id, u.fullname as author_name, u.username as author_username, c.parent_comment_id, c.content, c.is_edited, c.created_at, c.updated_at
 FROM comments c
 JOIN users u
 ON c.author_id = u.id

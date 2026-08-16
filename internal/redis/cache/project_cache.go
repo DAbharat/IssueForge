@@ -73,5 +73,9 @@ func (c *RedisProjectCache) SetProject(ctx context.Context, project dto.ProjectR
 }
 
 func (c *RedisProjectCache) DeleteProject(ctx context.Context, projectID int64) error {
+	if projectID <= 0 {
+		return errors.New("invalid project id")
+	}
+
 	return c.client.Del(ctx, projectKey(projectID)).Err()
 }

@@ -71,12 +71,12 @@ func (s *WorkspaceMemberService) GetWorkspaceMember(ctx context.Context, workspa
 		return dto.WorkspaceMemberSummary{}, fmt.Errorf("get workspace member: %w", err)
 	}
 	return dto.WorkspaceMemberSummary{
-		ID:          member.UserID,
-		Fullname:    member.Fullname,
-		DisplayName: member.DisplayName,
-		Email:       member.Email,
-		Role:        string(member.Role),
-		JoinedAt:    member.JoinedAt.Time,
+		ID:       member.UserID,
+		Fullname: member.Fullname,
+		Username: member.Username,
+		Email:    member.Email,
+		Role:     string(member.Role),
+		JoinedAt: member.JoinedAt.Time,
 	}, nil
 }
 
@@ -123,12 +123,12 @@ func (s *WorkspaceMemberService) ListWorkspaceMembers(ctx context.Context, works
 
 	for _, mem := range members {
 		result = append(result, dto.WorkspaceMemberDetails{
-			UserID:      mem.ID,
-			DisplayName: mem.DisplayName,
-			Fullname:    mem.Fullname,
-			Email:       mem.Email,
-			Role:        string(mem.Role),
-			JoinedAt:    mem.JoinedAt.Time,
+			UserID:   mem.ID,
+			Username: mem.Username,
+			Fullname: mem.Fullname,
+			Email:    mem.Email,
+			Role:     string(mem.Role),
+			JoinedAt: mem.JoinedAt.Time,
 		})
 	}
 	return result, nil

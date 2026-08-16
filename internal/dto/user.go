@@ -1,17 +1,27 @@
 package dto
 
+import "time"
+
 type CreateUserRequest struct {
-	DisplayName string `json:"display_name"`
-	Fullname    string `json:"fullname"`
-	Email       string `json:"email"`
-	Password    string `json:"password"`
+	Username string `json:"username"`
+	Fullname string `json:"fullname"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type CreateUserResponse struct {
-	ID          int64  `json:"id"`
-	DisplayName string `json:"display_name"`
-	Fullname    string `json:"fullname"`
-	Email       string `json:"email"`
+	ID       int64  `json:"id"`
+	Username string `json:"username"`
+	Fullname string `json:"fullname"`
+	Email    string `json:"email"`
+}
+
+type UserResponse struct {
+	ID        int64     `json:"id"`
+	Username  string    `json:"username"`
+	Fullname  string    `json:"fullname"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type LoginUserRequest struct {
@@ -36,9 +46,9 @@ type WorkspaceSummary struct {
 }
 
 type MeResponse struct {
-	ID          int64              `json:"id"`
-	DisplayName string             `json:"display_name"`
-	Fullname    string             `json:"fullname"`
-	Email       string             `json:"email"`
-	Workspaces  []WorkspaceSummary `json:"workspaces"`
+	ID         int64              `json:"id"`
+	Username   string             `json:"username"`
+	Fullname   string             `json:"fullname"`
+	Email      string             `json:"email"`
+	Workspaces []WorkspaceSummary `json:"workspaces"`
 }

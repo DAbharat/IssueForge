@@ -60,6 +60,7 @@ func main() {
 	projectCache := cache.NewRedisProjectCache(redisClient, cfg.RedisTTL)
 	workspaceCache := cache.NewRedisWorkspaceCache(redisClient, cfg.RedisTTL)
 	issueCache := cache.NewIssueCache(redisClient, cfg.RedisTTL)
+	workspaceInvitationCache := cache.NewWorkspaceInvitationCache(redisClient, cfg.RedisTTL)
 
 	rateLimiter := ratelimit.NewRateLimiter(redisClient, true)
 
@@ -160,6 +161,10 @@ func main() {
 	labelsService := service.NewLabelsService(labelsRepo, issueRepo, authzService)
 	labelsHandler := handler.NewLabelsHandler(labelsService)
 
+	workspaceInvitationRepo := repository.NewWorkspaceInvitationRepository(pool, queries)
+	workspaceInvitationService := service.NewWorkspaceInvitationService(workspaceInvitationRepo, workspaceInvitationCache, authzService)
+	workspaceInvitationHandler := handler.NewWorkspaceInvitationHandler(workspaceInvitationService)
+
 	r := router.New(userHandler,
 		projectHandler,
 		projectMemberHandler,
@@ -170,6 +175,7 @@ func main() {
 		issueActivityHandler,
 		issueAttachmentsHandler,
 		labelsHandler,
+		workspaceInvitationHandler,
 		authMiddleware,
 		reg,
 		strictRateLimit,
