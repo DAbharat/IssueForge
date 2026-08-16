@@ -42,7 +42,7 @@ func (q *Queries) AddWorkspaceMember(ctx context.Context, arg AddWorkspaceMember
 }
 
 const getWorkspaceMember = `-- name: GetWorkspaceMember :one
-SELECT wm.workspace_id, wm.user_id, wm.role, wm.joined_at, u.email, u.fullname, u.fullname, u.username
+SELECT wm.workspace_id, wm.user_id, wm.role, wm.joined_at, u.email, u.fullname, u.username
 FROM workspace_members wm
 JOIN users u ON wm.user_id = u.id
 JOIN workspaces w ON wm.workspace_id = w.id
@@ -63,7 +63,6 @@ type GetWorkspaceMemberRow struct {
 	JoinedAt    pgtype.Timestamptz `json:"joined_at"`
 	Email       string             `json:"email"`
 	Fullname    string             `json:"fullname"`
-	Fullname_2  string             `json:"fullname_2"`
 	Username    string             `json:"username"`
 }
 
@@ -77,7 +76,6 @@ func (q *Queries) GetWorkspaceMember(ctx context.Context, arg GetWorkspaceMember
 		&i.JoinedAt,
 		&i.Email,
 		&i.Fullname,
-		&i.Fullname_2,
 		&i.Username,
 	)
 	return i, err
@@ -168,7 +166,7 @@ func (q *Queries) ListUserWorkspaces(ctx context.Context, arg ListUserWorkspaces
 }
 
 const listWorkspaceMembers = `-- name: ListWorkspaceMembers :many
-SELECT u.id, u.fullname, u.fullname, u.username, u.email, wm.role, wm.joined_at
+SELECT u.id, u.fullname, u.username, u.email, wm.role, wm.joined_at
 FROM workspace_members wm
 JOIN users u ON wm.user_id = u.id
 JOIN workspaces w ON wm.workspace_id = w.id
@@ -177,13 +175,12 @@ ORDER BY wm.joined_at ASC
 `
 
 type ListWorkspaceMembersRow struct {
-	ID         int64              `json:"id"`
-	Fullname   string             `json:"fullname"`
-	Fullname_2 string             `json:"fullname_2"`
-	Username   string             `json:"username"`
-	Email      string             `json:"email"`
-	Role       UserRole           `json:"role"`
-	JoinedAt   pgtype.Timestamptz `json:"joined_at"`
+	ID       int64              `json:"id"`
+	Fullname string             `json:"fullname"`
+	Username string             `json:"username"`
+	Email    string             `json:"email"`
+	Role     UserRole           `json:"role"`
+	JoinedAt pgtype.Timestamptz `json:"joined_at"`
 }
 
 func (q *Queries) ListWorkspaceMembers(ctx context.Context, workspaceID int64) ([]ListWorkspaceMembersRow, error) {
@@ -198,7 +195,6 @@ func (q *Queries) ListWorkspaceMembers(ctx context.Context, workspaceID int64) (
 		if err := rows.Scan(
 			&i.ID,
 			&i.Fullname,
-			&i.Fullname_2,
 			&i.Username,
 			&i.Email,
 			&i.Role,

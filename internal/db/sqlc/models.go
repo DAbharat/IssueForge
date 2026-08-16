@@ -294,6 +294,16 @@ type Workspace struct {
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
+type WorkspaceInvitation struct {
+	ID            int64              `json:"id"`
+	WorkspaceID   int64              `json:"workspace_id"`
+	InvitedUserID int64              `json:"invited_user_id"`
+	InvitedBy     int64              `json:"invited_by"`
+	Status        string             `json:"status"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	RespondedAt   pgtype.Timestamptz `json:"responded_at"`
+}
+
 type WorkspaceMember struct {
 	WorkspaceID int64              `json:"workspace_id"`
 	UserID      int64              `json:"user_id"`

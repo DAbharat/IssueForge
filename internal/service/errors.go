@@ -61,4 +61,7 @@ var (
 	ErrLabelDoesNotBelongToProject   = errors.New("label does not belong to project")
 	ErrLabelNotAttached              = errors.New("label not attached")
 	ErrRefTokenNotFound              = errors.New("refresh token not found")
+	ErrPendingInvitationExists       = errors.New("a pending invitation already exists")
+	ErrInvalidInvitationID           = errors.New("invalid invitation id")
+	ErrInvitationNotFound            = errors.New("invitation not found")
 )

@@ -67,5 +67,9 @@ func (c *RedisIssueCache) SetIssue(ctx context.Context, issue dto.IssueResponse)
 }
 
 func (c *RedisIssueCache) DeleteIssue(ctx context.Context, issueID int64) error {
+	if issueID <= 0 {
+		return errors.New("invalid issue id")
+	}
+
 	return c.client.Del(ctx, issueKey(issueID)).Err()
 }

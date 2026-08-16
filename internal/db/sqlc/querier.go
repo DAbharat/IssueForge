@@ -11,9 +11,11 @@ import (
 )
 
 type Querier interface {
+	AcceptInvitation(ctx context.Context, arg AcceptInvitationParams) (AcceptInvitationRow, error)
 	AddMemberToProject(ctx context.Context, arg AddMemberToProjectParams) (ProjectMember, error)
 	AddWorkspaceMember(ctx context.Context, arg AddWorkspaceMemberParams) (WorkspaceMember, error)
 	AttachLabelsToIssue(ctx context.Context, arg AttachLabelsToIssueParams) error
+	CancelInvitation(ctx context.Context, arg CancelInvitationParams) (CancelInvitationRow, error)
 	CountProjectLabels(ctx context.Context, arg CountProjectLabelsParams) (int64, error)
 	CreateActivity(ctx context.Context, arg CreateActivityParams) (IssueActivity, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (IssueAttachment, error)
@@ -23,6 +25,8 @@ type Querier interface {
 	CreateOnboardingUser(ctx context.Context, arg CreateOnboardingUserParams) (CreateOnboardingUserRow, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
 	CreateWorkspace(ctx context.Context, name string) (CreateWorkspaceRow, error)
+	CreateWorkspaceInvitation(ctx context.Context, arg CreateWorkspaceInvitationParams) (WorkspaceInvitation, error)
+	DeclineInvitation(ctx context.Context, arg DeclineInvitationParams) (DeclineInvitationRow, error)
 	DeleteComment(ctx context.Context, id int64) (int64, error)
 	DeleteIssue(ctx context.Context, id int64) (int64, error)
 	DeleteLabel(ctx context.Context, id int64) (DeleteLabelRow, error)
@@ -41,6 +45,7 @@ type Querier interface {
 	GetUserForLogin(ctx context.Context, email string) (GetUserForLoginRow, error)
 	GetWorkspaceByID(ctx context.Context, id int64) (GetWorkspaceByIDRow, error)
 	GetWorkspaceByName(ctx context.Context, name string) (GetWorkspaceByNameRow, error)
+	GetWorkspaceInvitation(ctx context.Context, id int64) (WorkspaceInvitation, error)
 	GetWorkspaceMember(ctx context.Context, arg GetWorkspaceMemberParams) (GetWorkspaceMemberRow, error)
 	IsProjectLead(ctx context.Context, arg IsProjectLeadParams) (bool, error)
 	IsProjectMember(ctx context.Context, arg IsProjectMemberParams) (bool, error)
@@ -53,6 +58,8 @@ type Querier interface {
 	ListIssueAttachments(ctx context.Context, issueID int64) ([]ListIssueAttachmentsRow, error)
 	ListIssueComments(ctx context.Context, arg ListIssueCommentsParams) ([]ListIssueCommentsRow, error)
 	ListIssueLabels(ctx context.Context, issueID int64) ([]Label, error)
+	ListPendingWorkspaceInvitations(ctx context.Context, invitedUserID int64) ([]ListPendingWorkspaceInvitationsRow, error)
+	ListPendingWorkspaceInvitationsForWorkspace(ctx context.Context, workspaceID int64) ([]ListPendingWorkspaceInvitationsForWorkspaceRow, error)
 	ListProjectIssues(ctx context.Context, arg ListProjectIssuesParams) ([]ListProjectIssuesRow, error)
 	ListProjectLabels(ctx context.Context, projectID int64) ([]Label, error)
 	ListProjectMembers(ctx context.Context, projectID int64) ([]ListProjectMembersRow, error)

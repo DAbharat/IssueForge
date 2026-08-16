@@ -67,5 +67,9 @@ func (c *RedisWorkspaceCache) SetWorkspace(ctx context.Context, workspace dto.Wo
 }
 
 func (c *RedisWorkspaceCache) DeleteWorkspace(ctx context.Context, workspaceID int64) error {
+	if workspaceID <= 0 {
+		return errors.New("invalid workspace id")
+	}
+
 	return c.client.Del(ctx, workspaceKey(workspaceID)).Err()
 }

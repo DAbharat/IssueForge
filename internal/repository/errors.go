@@ -26,4 +26,7 @@ var (
 	ErrLabelAlreadyExists            = errors.New("label already exists")
 	ErrLabelNotFound                 = errors.New("label not found")
 	ErrLabelNotAttached              = errors.New("label not attached")
+	ErrInvitationNotFound            = errors.New("workspace invitation not found")
+	ErrPendingInvitationExists       = errors.New("pending workspace invitation already exists")
+	ErrInvitationNotPending          = errors.New("invitation is still pending")
 )
