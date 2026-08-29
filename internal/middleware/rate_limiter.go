@@ -26,6 +26,11 @@ func NewRateLimitMiddleware(limiter *ratelimit.RateLimiter, capacity int, refill
 
 func (m *RateLimitMiddleware) Limit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		var key string
 
 		userID, ok := GetUserFromContext(r.Context())
