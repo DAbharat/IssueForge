@@ -40,9 +40,10 @@ type RefreshTokenRequest struct {
 }
 
 type WorkspaceSummary struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
-	Role string `json:"role"`
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type MeResponse struct {

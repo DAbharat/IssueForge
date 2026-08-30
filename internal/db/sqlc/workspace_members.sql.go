@@ -122,7 +122,7 @@ func (q *Queries) IsWorkspaceMember(ctx context.Context, arg IsWorkspaceMemberPa
 }
 
 const listUserWorkspaces = `-- name: ListUserWorkspaces :many
-SELECT w.id, w.name, wm.role
+SELECT w.id, w.name, wm.role, w.created_at
 FROM workspace_members wm
 JOIN workspaces w ON wm.workspace_id = w.id
 WHERE wm.user_id = $1
@@ -140,9 +140,10 @@ type ListUserWorkspacesParams struct {
 }
 
 type ListUserWorkspacesRow struct {
-	ID   int64    `json:"id"`
-	Name string   `json:"name"`
-	Role UserRole `json:"role"`
+	ID        int64              `json:"id"`
+	Name      string             `json:"name"`
+	Role      UserRole           `json:"role"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 func (q *Queries) ListUserWorkspaces(ctx context.Context, arg ListUserWorkspacesParams) ([]ListUserWorkspacesRow, error) {
@@ -154,7 +155,12 @@ func (q *Queries) ListUserWorkspaces(ctx context.Context, arg ListUserWorkspaces
 	var items []ListUserWorkspacesRow
 	for rows.Next() {
 		var i ListUserWorkspacesRow
-		if err := rows.Scan(&i.ID, &i.Name, &i.Role); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Role,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

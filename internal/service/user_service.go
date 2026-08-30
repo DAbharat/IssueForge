@@ -222,9 +222,10 @@ func (s *UserService) mapWorkspaces(workspaces []sqlc.ListUserWorkspacesRow) []d
 	workspaceSummaries := make([]dto.WorkspaceSummary, 0, len(workspaces))
 	for _, ws := range workspaces {
 		workspaceSummaries = append(workspaceSummaries, dto.WorkspaceSummary{
-			ID:   ws.ID,
-			Name: ws.Name,
-			Role: string(ws.Role),
+			ID:        ws.ID,
+			Name:      ws.Name,
+			Role:      string(ws.Role),
+			CreatedAt: ws.CreatedAt.Time,
 		})
 	}
 	return workspaceSummaries

@@ -46,7 +46,7 @@ AND w.deleted_at IS NULL;
 
 
 -- name: ListUserWorkspaces :many
-SELECT w.id, w.name, wm.role
+SELECT w.id, w.name, wm.role, w.created_at
 FROM workspace_members wm
 JOIN workspaces w ON wm.workspace_id = w.id
 WHERE wm.user_id = sqlc.arg(user_id)
