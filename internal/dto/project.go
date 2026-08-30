@@ -31,6 +31,7 @@ type ProjectResponse struct {
 	ID          int64     `json:"id"`
 	WorkspaceID int64     `json:"workspace_id"`
 	LeadID      int64     `json:"lead_id"`
+	LeadName    string    `json:"lead_name"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	CreatedAt   time.Time `json:"created_at"`

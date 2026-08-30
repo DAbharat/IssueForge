@@ -124,11 +124,13 @@ func (q *Queries) IsProjectLead(ctx context.Context, arg IsProjectLeadParams) (b
 }
 
 const listProjectsByLead = `-- name: ListProjectsByLead :many
-SELECT id, workspace_id, lead_id, name, description, created_at, updated_at
-FROM projects
-WHERE workspace_id = $1 AND deleted_at IS NULL
-    AND ($2::BIGINT IS NULL OR lead_id = $2::BIGINT)
-ORDER BY created_at DESC
+SELECT p.id, p.workspace_id, p.lead_id, p.name, p.description, p.created_at, p.updated_at,
+        u.fullname
+FROM projects p
+JOIN users u ON p.lead_id = u.id
+WHERE p.workspace_id = $1 AND p.deleted_at IS NULL
+    AND ($2::BIGINT IS NULL OR p.lead_id = $2::BIGINT)
+ORDER BY p.created_at DESC
 `
 
 type ListProjectsByLeadParams struct {
@@ -144,6 +146,7 @@ type ListProjectsByLeadRow struct {
 	Description string             `json:"description"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	Fullname    string             `json:"fullname"`
 }
 
 func (q *Queries) ListProjectsByLead(ctx context.Context, arg ListProjectsByLeadParams) ([]ListProjectsByLeadRow, error) {
@@ -163,6 +166,7 @@ func (q *Queries) ListProjectsByLead(ctx context.Context, arg ListProjectsByLead
 			&i.Description,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Fullname,
 		); err != nil {
 			return nil, err
 		}

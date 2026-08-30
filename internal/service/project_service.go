@@ -288,6 +288,7 @@ func (s *ProjectService) ListProjectsByLead(ctx context.Context, requesterID, wo
 			ID:          p.ID,
 			WorkspaceID: p.WorkspaceID,
 			LeadID:      p.LeadID,
+			LeadName:    p.Fullname,
 			Name:        p.Name,
 			Description: p.Description,
 		})
