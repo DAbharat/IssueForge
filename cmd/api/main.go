@@ -66,8 +66,8 @@ func main() {
 
 	strictRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 5, 5.0/60)
 	authRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 3, 3.0/60)
-	readRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 200, 200.0/60)
 	attachmentRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 10, 10.0/60)
+	readRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 200, 200.0/60)
 	writeRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 30, 30.0/60)
 	issueRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 60, 60.0/60)
 	deleteRateLimit := middleware.NewRateLimitMiddleware(rateLimiter, 20, 20.0/60)

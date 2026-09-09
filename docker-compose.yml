@@ -16,6 +16,7 @@ services:
       - .env
     environment:
       - DB_HOST=postgres
+      - REDIS_ADDR=redis:6379
 
   postgres:
     image: postgres:17-alpine

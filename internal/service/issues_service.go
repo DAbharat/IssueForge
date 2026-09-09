@@ -213,14 +213,16 @@ func (s *IssueService) ListProjectIssues(ctx context.Context, requesterID, proje
 		return nil, ErrInvalidAssignee
 	}
 
-	search := strings.TrimSpace(*req.Search)
-	if search == "" {
-		req.Search = nil
-	} else {
-		if utf8.RuneCountInString(search) > 50 {
-			return nil, ErrInvalidSearchQuery
+	if req.Search != nil {
+		search := strings.TrimSpace(*req.Search)
+		if search == "" {
+			req.Search = nil
+		} else {
+			if utf8.RuneCountInString(search) > 50 {
+				return nil, ErrInvalidSearchQuery
+			}
+			req.Search = &search
 		}
-		req.Search = &search
 	}
 
 	if req.Status != nil {

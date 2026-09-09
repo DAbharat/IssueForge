@@ -58,3 +58,7 @@ tmp/
 # Vendor (Uncomment if you don't commit vendor/)
 # =========================
 # vendor/
+
+docker-compose.override.yml
+benchmarks/
+numbers.txt
