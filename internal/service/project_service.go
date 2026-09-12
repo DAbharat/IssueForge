@@ -109,6 +109,7 @@ func (s *ProjectService) GetProjectByID(ctx context.Context, requesterID, projec
 		ID:          project.ID,
 		WorkspaceID: project.WorkspaceID,
 		LeadID:      project.LeadID,
+		LeadName:    project.LeadName,
 		Name:        project.Name,
 		Description: project.Description,
 		CreatedAt:   project.CreatedAt.Time,
@@ -288,7 +289,7 @@ func (s *ProjectService) ListProjectsByLead(ctx context.Context, requesterID, wo
 			ID:          p.ID,
 			WorkspaceID: p.WorkspaceID,
 			LeadID:      p.LeadID,
-			LeadName:    p.Fullname,
+			LeadName:    p.LeadName,
 			Name:        p.Name,
 			Description: p.Description,
 		})

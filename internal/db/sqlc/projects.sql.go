@@ -73,9 +73,11 @@ func (q *Queries) DeleteProject(ctx context.Context, id int64) (DeleteProjectRow
 }
 
 const getProjectByID = `-- name: GetProjectByID :one
-SELECT id, workspace_id, lead_id, name, description, created_at, updated_at
-FROM projects
-WHERE id = $1 AND deleted_at IS NULL
+SELECT p.id, p.workspace_id, p.lead_id, p.name, p.description, p.created_at, p.updated_at,
+    u.fullname as lead_name
+FROM projects p
+JOIN users u ON p.lead_id = u.id
+WHERE p.id = $1 AND p.deleted_at IS NULL
 `
 
 type GetProjectByIDRow struct {
@@ -86,6 +88,7 @@ type GetProjectByIDRow struct {
 	Description string             `json:"description"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	LeadName    string             `json:"lead_name"`
 }
 
 func (q *Queries) GetProjectByID(ctx context.Context, id int64) (GetProjectByIDRow, error) {
@@ -99,6 +102,7 @@ func (q *Queries) GetProjectByID(ctx context.Context, id int64) (GetProjectByIDR
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LeadName,
 	)
 	return i, err
 }
@@ -125,7 +129,7 @@ func (q *Queries) IsProjectLead(ctx context.Context, arg IsProjectLeadParams) (b
 
 const listProjectsByLead = `-- name: ListProjectsByLead :many
 SELECT p.id, p.workspace_id, p.lead_id, p.name, p.description, p.created_at, p.updated_at,
-        u.fullname
+        u.fullname as lead_name
 FROM projects p
 JOIN users u ON p.lead_id = u.id
 WHERE p.workspace_id = $1 AND p.deleted_at IS NULL
@@ -146,7 +150,7 @@ type ListProjectsByLeadRow struct {
 	Description string             `json:"description"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	Fullname    string             `json:"fullname"`
+	LeadName    string             `json:"lead_name"`
 }
 
 func (q *Queries) ListProjectsByLead(ctx context.Context, arg ListProjectsByLeadParams) ([]ListProjectsByLeadRow, error) {
@@ -166,7 +170,7 @@ func (q *Queries) ListProjectsByLead(ctx context.Context, arg ListProjectsByLead
 			&i.Description,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.Fullname,
+			&i.LeadName,
 		); err != nil {
 			return nil, err
 		}

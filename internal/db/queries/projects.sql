@@ -12,9 +12,11 @@ RETURNING id, workspace_id, lead_id, name, description, created_at, updated_at, 
 
 
 -- name: GetProjectByID :one
-SELECT id, workspace_id, lead_id, name, description, created_at, updated_at
-FROM projects
-WHERE id = $1 AND deleted_at IS NULL;
+SELECT p.id, p.workspace_id, p.lead_id, p.name, p.description, p.created_at, p.updated_at,
+    u.fullname as lead_name
+FROM projects p
+JOIN users u ON p.lead_id = u.id
+WHERE p.id = $1 AND p.deleted_at IS NULL;
 
 
 -- name: UpdateProjectDetails :one
@@ -34,7 +36,7 @@ RETURNING id, workspace_id, lead_id, name, description, created_at, updated_at, 
 
 -- name: ListProjectsByLead :many
 SELECT p.id, p.workspace_id, p.lead_id, p.name, p.description, p.created_at, p.updated_at,
-        u.fullname
+        u.fullname as lead_name
 FROM projects p
 JOIN users u ON p.lead_id = u.id
 WHERE p.workspace_id = $1 AND p.deleted_at IS NULL
