@@ -40,3 +40,5 @@ require (
 	golang.org/x/text v0.40.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
+
+replace go.codycody31.dev/gobullmq => github.com/DAbharat/gobullmq v0.0.0-20260913090013-176022d57c7a

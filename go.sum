@@ -1,3 +1,5 @@
+github.com/DAbharat/gobullmq v0.0.0-20260913090013-176022d57c7a h1:SSx4JodG193QPOp7zx7ULisemdXrLr1uyintmm8VhE4=
+github.com/DAbharat/gobullmq v0.0.0-20260913090013-176022d57c7a/go.mod h1:X6yay38AQKeqDcF8gszBKai+BWZomw/vN4wIvHO4+Tc=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bsm/ginkgo/v2 v2.12.0 h1:Ny8MWAHyOepLGlLKYmXG4IEkioBysk6GpaRTLC8zwWs=
@@ -72,8 +74,6 @@ github.com/vmihailenco/tagparser/v2 v2.0.0 h1:y09buUbR+b5aycVFQs/g70pqKVZNBmxwAh
 github.com/vmihailenco/tagparser/v2 v2.0.0/go.mod h1:Wri+At7QHww0WTrCBeu4J6bNtoV6mEfg5OIWRZA9qds=
 github.com/zeebo/xxh3 v1.1.0 h1:s7DLGDK45Dyfg7++yxI0khrfwq9661w9EN78eP/UZVs=
 github.com/zeebo/xxh3 v1.1.0/go.mod h1:IisAie1LELR4xhVinxWS5+zf1lA4p0MW4T+w+W07F5s=
-go.codycody31.dev/gobullmq v1.1.0 h1:r8X8HsMlv+83IpHsOO68DlDRkk75XZ1qCrIRN//nWNI=
-go.codycody31.dev/gobullmq v1.1.0/go.mod h1:X6yay38AQKeqDcF8gszBKai+BWZomw/vN4wIvHO4+Tc=
 go.uber.org/atomic v1.11.0 h1:ZvwS0R+56ePWxUNi+Atn9dWONBPp/AUETXlHW0DxSjE=
 go.uber.org/atomic v1.11.0/go.mod h1:LUxbIzbOniOlMKjJjyPfpl4v+PKK2cNJn91OQbhoJI0=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=

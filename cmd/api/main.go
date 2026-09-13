@@ -85,13 +85,16 @@ func main() {
 
 	cloudStorage := storage.NewCloudinaryStorage(cld)
 
-	attachmentDeleteQueue, err := queue.NewAttachmentDeleteQueue(redisClient)
+	queueClient, err := redis.NewClient(cfg)
+	workerClient, err := redis.NewClient(cfg)
+
+	attachmentDeleteQueue, err := queue.NewAttachmentDeleteQueue(queueClient)
 	if err != nil {
 		log.Fatalf("initialize attachment queue: %v", err)
 	}
 	defer attachmentDeleteQueue.Close()
 
-	attachmentDeleteWorker, err := queue.NewAttachmentDeleteWorker(redisClient, cloudStorage)
+	attachmentDeleteWorker, err := queue.NewAttachmentDeleteWorker(workerClient, cloudStorage)
 	if err != nil {
 		log.Fatalf("initialize attachment delete worker: %v", err)
 	}
