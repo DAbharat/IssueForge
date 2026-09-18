@@ -18,7 +18,7 @@ type CommentResponse struct {
 	AuthorID        int64     `json:"author_id"`
 	AuthorName      string    `json:"author_name"`
 	ParentCommentID *int64    `json:"parent_comment_id"`
-	Content         string    `jsson:"content"`
+	Content         string    `json:"content"`
 	IsEdited        bool      `json:"is_edited"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`

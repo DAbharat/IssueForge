@@ -17,6 +17,7 @@ type WorkspaceMemberRepos interface {
 	ListUserWorkspaces(ctx context.Context, userID int64, search string) ([]sqlc.ListUserWorkspacesRow, error)
 	ListWorkspaceMembers(ctx context.Context, workspaceID int64) ([]sqlc.ListWorkspaceMembersRow, error)
 	RemoveWorkspaceMember(ctx context.Context, workspaceID, userID int64) (sqlc.RemoveWorkspaceMemberRow, error)
+	PromoteMemberToAdmin(ctx context.Context, userID, workspaceID int64) (sqlc.PromoteMemberToAdminRow, error)
 }
 
 type WorkspaceMemberService struct {
@@ -149,5 +150,32 @@ func (s *WorkspaceMemberService) RemoveWorkspaceMember(ctx context.Context, work
 	return dto.RemoveWorkspaceMemberResponse{
 		WorkspaceID: member.WorkspaceID,
 		UserID:      member.UserID,
+	}, nil
+}
+
+func (s *WorkspaceMemberService) PromoteMemberToAdmin(ctx context.Context, req dto.PromoteMemberRequest, workspaceID int64, adminID int64) (dto.WorkspaceMemberDetails, error) {
+	if req.UserID <= 0 {
+		return dto.WorkspaceMemberDetails{}, ErrInvalidUserID
+	}
+	if adminID <= 0 {
+		return dto.WorkspaceMemberDetails{}, ErrInvalidUserID
+	}
+
+	if err := s.authz.RequireWorkspaceAdmin(ctx, workspaceID, adminID); err != nil {
+		return dto.WorkspaceMemberDetails{}, ErrForbidden
+	}
+
+	admin, err := s.repo.PromoteMemberToAdmin(ctx, req.UserID, workspaceID)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return dto.WorkspaceMemberDetails{}, ErrUserNotFound
+		}
+		return dto.WorkspaceMemberDetails{}, fmt.Errorf("promote member to admin: %w", err)
+	}
+
+	return dto.WorkspaceMemberDetails{
+		WorkspaceID: admin.WorkspaceID,
+		UserID:      admin.UserID,
+		Role:        string(admin.Role),
 	}, nil
 }

@@ -138,3 +138,20 @@ func (r *WorkspaceMemberRepository) RemoveWorkspaceMember(ctx context.Context, w
 
 	return removedMember, nil
 }
+
+func (r *WorkspaceMemberRepository) PromoteMemberToAdmin(ctx context.Context, userID, workspaceID int64) (sqlc.PromoteMemberToAdminRow, error) {
+	params := sqlc.PromoteMemberToAdminParams{
+		UserID:      userID,
+		WorkspaceID: workspaceID,
+	}
+
+	result, err := r.queries.PromoteMemberToAdmin(ctx, params)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.PromoteMemberToAdminRow{}, ErrWorkspaceMemberNotFound
+		}
+		return sqlc.PromoteMemberToAdminRow{}, fmt.Errorf("promote member to admin: %w", err)
+	}
+
+	return result, nil
+}

@@ -86,6 +86,9 @@ func (r *UserRepository) SearchUserByUsername(ctx context.Context, search *strin
 	if search != nil {
 		newSearch.String = *search
 		newSearch.Valid = true
+	} else {
+		newSearch.String = ""
+		newSearch.Valid = true
 	}
 
 	user, err := r.queries.SearchUserByUsername(ctx, newSearch)

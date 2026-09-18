@@ -30,6 +30,12 @@ func registerUserRoutes(r *mux.Router, userHandler *handler.UserHandler, authMid
 		),
 	).Methods("GET")
 
+	r.Handle("/api/users/search",
+		authMiddleware.Authenticate(
+			readRateLimit.Limit(http.HandlerFunc(userHandler.SearchUserByUsername)),
+		),
+	).Methods("GET")
+
 	r.Handle("/api/users/{userID}",
 		authMiddleware.Authenticate(
 			readRateLimit.Limit(http.HandlerFunc(userHandler.GetUserByID)),
@@ -39,12 +45,6 @@ func registerUserRoutes(r *mux.Router, userHandler *handler.UserHandler, authMid
 	r.Handle("/api/users/{username}",
 		authMiddleware.Authenticate(
 			readRateLimit.Limit(http.HandlerFunc(userHandler.GetUserByUsername)),
-		),
-	).Methods("GET")
-
-	r.Handle("/api/users/search",
-		authMiddleware.Authenticate(
-			readRateLimit.Limit(http.HandlerFunc(userHandler.SearchUserByUsername)),
 		),
 	).Methods("GET")
 

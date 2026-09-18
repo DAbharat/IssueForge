@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func registerWorkspaceMemberRoutes(r *mux.Router, workspaceMemberHandler *handler.WorkspaceMemberHandler, authMiddleware *middleware.AuthMiddleware, readRateLimit *middleware.RateLimitMiddleware) {
+func registerWorkspaceMemberRoutes(r *mux.Router, workspaceMemberHandler *handler.WorkspaceMemberHandler, authMiddleware *middleware.AuthMiddleware, readRateLimit, strictRateLimit *middleware.RateLimitMiddleware) {
 	r.Handle("/api/workspaces/{workspaceID}/members",
 		authMiddleware.Authenticate(http.HandlerFunc(workspaceMemberHandler.AddWorkspaceMember)),
 	).Methods("POST")
@@ -34,4 +34,10 @@ func registerWorkspaceMemberRoutes(r *mux.Router, workspaceMemberHandler *handle
 	r.Handle("/api/workspaces/{workspaceID}/members/{userID}",
 		authMiddleware.Authenticate(http.HandlerFunc(workspaceMemberHandler.RemoveWorkspaceMember)),
 	).Methods("DELETE")
+
+	r.Handle("/api/workspaces/{workspaceID}/member/promote",
+		authMiddleware.Authenticate(
+			strictRateLimit.Limit(http.HandlerFunc(workspaceMemberHandler.PromoteMemberToAdmin)),
+		),
+	).Methods("PATCH")
 }

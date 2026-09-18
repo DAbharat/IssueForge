@@ -30,10 +30,17 @@ ORDER BY wm.joined_at ASC;
 
 
 -- name: RemoveWorkspaceMember :one
-DELETE FROM workspace_members
-WHERE workspace_id = $1
-AND user_id = $2
-RETURNING workspace_id, user_id;
+WITH deleted_project_members AS (
+    DELETE FROM project_members pm
+    USING projects p
+    WHERE pm.project_id = p.id AND p.workspace_id = $1 AND pm.user_id = $2
+),
+deleted_workspace_member AS (
+    DELETE FROM workspace_members
+    WHERE workspace_id = $1 AND user_id = $2
+    RETURNING workspace_id, user_id
+)
+SELECT dwm.workspace_id, dwm.user_id FROM deleted_workspace_member dwm;
 
 
 -- name: IsWorkspaceMember :one
@@ -63,3 +70,11 @@ SELECT wm.role
 FROM workspace_members wm
 WHERE wm.workspace_id = $1
 AND wm.user_id = $2;
+
+
+-- name: PromoteMemberToAdmin :one
+UPDATE workspace_members wm
+SET role = 'ADMIN'
+FROM workspaces w
+WHERE wm.workspace_id = w.id AND wm.user_id = $1 AND wm.workspace_id = $2 AND wm.role != 'ADMIN' AND w.deleted_at IS NULL
+RETURNING wm.workspace_id, wm.user_id, wm.role;

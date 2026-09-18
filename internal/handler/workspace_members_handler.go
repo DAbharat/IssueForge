@@ -23,6 +23,7 @@ type WorkspaceMemberService interface {
 	ListUserWorkspaces(ctx context.Context, userID int64, search string) ([]dto.WorkspaceSummary, error)
 	ListWorkspaceMembers(ctx context.Context, workspaceID, userID int64) ([]dto.WorkspaceMemberDetails, error)
 	RemoveWorkspaceMember(ctx context.Context, workspaceID, adminID, userID int64) (dto.RemoveWorkspaceMemberResponse, error)
+	PromoteMemberToAdmin(ctx context.Context, req dto.PromoteMemberRequest, workspaceID, adminID int64) (dto.WorkspaceMemberDetails, error)
 }
 
 type WorkspaceMemberHandler struct {
@@ -208,4 +209,51 @@ func (h *WorkspaceMemberHandler) RemoveWorkspaceMember(w http.ResponseWriter, r 
 		return
 	}
 	httpx.RespondWithJSON(w, http.StatusOK, member)
+}
+
+func (h *WorkspaceMemberHandler) PromoteMemberToAdmin(w http.ResponseWriter, r *http.Request) {
+	adminID, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+
+	var req dto.PromoteMemberRequest
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, "invalid or oversized request body")
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		httpx.RespondWithError(w, http.StatusBadRequest, "request body must contain a single JSON object")
+		return
+	}
+
+	vars := mux.Vars(r)
+
+	workspaceID, err := strconv.ParseInt(vars["workspaceID"], 10, 64)
+	if err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidWorkspaceID.Error())
+		return
+	}
+
+	admin, err := h.workspaceMemberService.PromoteMemberToAdmin(r.Context(), req, workspaceID, adminID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
+		case errors.Is(err, service.ErrUserNotFound):
+			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
+		default:
+			log.Printf("promote member to admin fail: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+
+	httpx.RespondWithJSON(w, http.StatusOK, admin)
 }

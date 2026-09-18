@@ -39,7 +39,7 @@ func New(userHandler *handler.UserHandler,
 	registerProjectRoutes(r, projectHandler, authMiddleware, readRateLimit, createRateLimit, patchRateLimit)
 	registerProjectMembersRoutes(r, projectMemberHandler, authMiddleware, readRateLimit)
 	registerWorkspaceRoutes(r, workspaceHandler, authMiddleware, readRateLimit, createRateLimit, patchRateLimit)
-	registerWorkspaceMemberRoutes(r, workspaceMemberHandler, authMiddleware, readRateLimit)
+	registerWorkspaceMemberRoutes(r, workspaceMemberHandler, authMiddleware, readRateLimit, strictRateLimit)
 	registerIssueRoutes(r, issueHandler, authMiddleware, createRateLimit, readRateLimit, deleteRateLimit, patchRateLimit)
 	registerCommentRoutes(r, commentHandler, authMiddleware)
 	registerIssueActivityRouter(r, issueActivityHandler, authMiddleware)

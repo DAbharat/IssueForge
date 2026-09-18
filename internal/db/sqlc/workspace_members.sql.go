@@ -216,11 +216,44 @@ func (q *Queries) ListWorkspaceMembers(ctx context.Context, workspaceID int64) (
 	return items, nil
 }
 
+const promoteMemberToAdmin = `-- name: PromoteMemberToAdmin :one
+UPDATE workspace_members wm
+SET role = 'ADMIN'
+FROM workspaces w
+WHERE wm.workspace_id = w.id AND wm.user_id = $1 AND wm.workspace_id = $2 AND wm.role != 'ADMIN' AND w.deleted_at IS NULL
+RETURNING wm.workspace_id, wm.user_id, wm.role
+`
+
+type PromoteMemberToAdminParams struct {
+	UserID      int64 `json:"user_id"`
+	WorkspaceID int64 `json:"workspace_id"`
+}
+
+type PromoteMemberToAdminRow struct {
+	WorkspaceID int64    `json:"workspace_id"`
+	UserID      int64    `json:"user_id"`
+	Role        UserRole `json:"role"`
+}
+
+func (q *Queries) PromoteMemberToAdmin(ctx context.Context, arg PromoteMemberToAdminParams) (PromoteMemberToAdminRow, error) {
+	row := q.db.QueryRow(ctx, promoteMemberToAdmin, arg.UserID, arg.WorkspaceID)
+	var i PromoteMemberToAdminRow
+	err := row.Scan(&i.WorkspaceID, &i.UserID, &i.Role)
+	return i, err
+}
+
 const removeWorkspaceMember = `-- name: RemoveWorkspaceMember :one
-DELETE FROM workspace_members
-WHERE workspace_id = $1
-AND user_id = $2
-RETURNING workspace_id, user_id
+WITH deleted_project_members AS (
+    DELETE FROM project_members pm
+    USING projects p
+    WHERE pm.project_id = p.id AND p.workspace_id = $1 AND pm.user_id = $2
+),
+deleted_workspace_member AS (
+    DELETE FROM workspace_members
+    WHERE workspace_id = $1 AND user_id = $2
+    RETURNING workspace_id, user_id
+)
+SELECT dwm.workspace_id, dwm.user_id FROM deleted_workspace_member dwm
 `
 
 type RemoveWorkspaceMemberParams struct {

@@ -35,6 +35,9 @@ RETURNING project_id, user_id, joined_at;
 SELECT u.id, u.email, u.fullname, u.fullname, u.username, pm.joined_at
 FROM project_members pm
 JOIN users u ON pm.user_id = u.id
+JOIN projects p ON pm.project_id = p.id
+JOIN workspace_members wm ON wm.workspace_id = p.workspace_id
+AND wm.user_id = pm.user_id
 WHERE pm.project_id = $1
 ORDER BY pm.joined_at ASC;
 
@@ -42,6 +45,9 @@ ORDER BY pm.joined_at ASC;
 -- name: IsProjectMember :one
 SELECT EXISTS (
     SELECT 1
-    FROM project_members
-    WHERE project_id = $1 AND user_id = $2
+    FROM project_members pm
+    JOIN projects p ON pm.project_id = p.id
+    JOIN workspace_members wm ON wm.workspace_id = p.workspace_id
+    AND wm.user_id = pm.user_id
+    WHERE pm.project_id = $1 AND pm.user_id = $2
 );

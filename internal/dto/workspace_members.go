@@ -37,3 +37,7 @@ type RemoveWorkspaceMemberResponse struct {
 	WorkspaceID int64 `json:"workspace_id"`
 	UserID      int64 `json:"user_id"`
 }
+
+type PromoteMemberRequest struct {
+	UserID int64 `json:"user_id"`
+}

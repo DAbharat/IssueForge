@@ -81,7 +81,7 @@ func (s *IssueService) CreateIssue(ctx context.Context, creatorID int64, req dto
 	if utf8.RuneCountInString(issueTitle) < 8 || utf8.RuneCountInString(issueTitle) > 50 {
 		return dto.CreateIssueResponse{}, ErrInvalidTitle
 	}
-	if utf8.RuneCountInString(issueDescription) < 10 || utf8.RuneCountInString(issueDescription) > 300 {
+	if utf8.RuneCountInString(issueDescription) < 10 || utf8.RuneCountInString(issueDescription) > 3000 {
 		return dto.CreateIssueResponse{}, ErrInvalidDescription
 	}
 

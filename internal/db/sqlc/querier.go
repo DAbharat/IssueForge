@@ -66,6 +66,7 @@ type Querier interface {
 	ListProjectsByLead(ctx context.Context, arg ListProjectsByLeadParams) ([]ListProjectsByLeadRow, error)
 	ListUserWorkspaces(ctx context.Context, arg ListUserWorkspacesParams) ([]ListUserWorkspacesRow, error)
 	ListWorkspaceMembers(ctx context.Context, workspaceID int64) ([]ListWorkspaceMembersRow, error)
+	PromoteMemberToAdmin(ctx context.Context, arg PromoteMemberToAdminParams) (PromoteMemberToAdminRow, error)
 	RemoveLabelFromIssue(ctx context.Context, arg RemoveLabelFromIssueParams) (int64, error)
 	RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) (RemoveWorkspaceMemberRow, error)
 	RestoreDeletedWorkspace(ctx context.Context, id int64) (RestoreDeletedWorkspaceRow, error)
