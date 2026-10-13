@@ -21,7 +21,7 @@ func NewIssueAttachmentsRepository(queries *sqlc.Queries) *IssueAttachmentsRepos
 	}
 }
 
-func (r *IssueAttachmentsRepository) CreateAttachment(ctx context.Context, issueID int64, commentID *int64, uploadedBy int64, originalName, storageKey, resourceType, mimeType string, fileSize int64) (sqlc.IssueAttachment, error) {
+func (r *IssueAttachmentsRepository) CreateAttachment(ctx context.Context, issueID int64, commentID *int64, uploadedBy int64, originalName, storageKey, resourceType, mimeType, publicURL string, fileSize int64) (sqlc.CreateAttachmentRow, error) {
 	var commenter pgtype.Int8
 	if commentID != nil {
 		commenter.Int64 = *commentID
@@ -36,6 +36,7 @@ func (r *IssueAttachmentsRepository) CreateAttachment(ctx context.Context, issue
 		StorageKey:   storageKey,
 		ResourceType: resourceType,
 		MimeType:     mimeType,
+		PublicUrl:    publicURL,
 		FileSize:     fileSize,
 	}
 
@@ -47,15 +48,15 @@ func (r *IssueAttachmentsRepository) CreateAttachment(ctx context.Context, issue
 			case "23503":
 				switch pgErr.ConstraintName {
 				case "issue_attachments_issue_id_fkey":
-					return sqlc.IssueAttachment{}, ErrIssueNotFound
+					return sqlc.CreateAttachmentRow{}, ErrIssueNotFound
 				case "issue_attachments_comment_id_fkey":
-					return sqlc.IssueAttachment{}, ErrCommentNotFound
+					return sqlc.CreateAttachmentRow{}, ErrCommentNotFound
 				case "issue_attachments_uploaded_by_fkey":
-					return sqlc.IssueAttachment{}, ErrUserNotFound
+					return sqlc.CreateAttachmentRow{}, ErrUserNotFound
 				}
 			}
 		}
-		return sqlc.IssueAttachment{}, fmt.Errorf("create attachment: %w", err)
+		return sqlc.CreateAttachmentRow{}, fmt.Errorf("create attachment: %w", err)
 	}
 	return attachment, nil
 }

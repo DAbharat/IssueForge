@@ -7,9 +7,12 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
+	"github.com/cloudinary/cloudinary-go/v2/asset"
 )
 
 type CloudinaryStorage struct {
@@ -79,10 +82,36 @@ func (s *CloudinaryStorage) Upload(ctx context.Context, file multipart.File, hea
 
 	return &UploadResult{
 		StorageKey:   resp.PublicID,
+		PublicURL:    resp.SecureURL,
 		ResourceType: resourceType,
 		MIMEType:     mimeType,
 		Size:         header.Size,
 	}, nil
+}
+
+func (s *CloudinaryStorage) PublicURL(storageKey, resourceType, format string) (string, error) {
+	var asset *asset.Asset
+	var err error
+
+	if resourceType == "raw" {
+		asset, err = s.client.File(storageKey)
+	} else {
+		asset, err = s.client.Image(storageKey)
+	}
+	if err != nil {
+		return "", err
+	}
+
+	url, err := asset.String()
+	if err != nil {
+		return "", err
+	}
+
+	if resourceType != "raw" && filepath.Ext(storageKey) == "" && format != "" {
+		url += "." + strings.TrimPrefix(format, ".")
+	}
+
+	return url, nil
 }
 
 func (s *CloudinaryStorage) Delete(ctx context.Context, storageKey, resourceType string) error {

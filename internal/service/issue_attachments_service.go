@@ -17,7 +17,7 @@ import (
 )
 
 type IssueAttachmentRepo interface {
-	CreateAttachment(ctx context.Context, issueID int64, commentID *int64, uploadedBy int64, originalName, storageKey, resourceType, mimeType string, fileSize int64) (sqlc.IssueAttachment, error)
+	CreateAttachment(ctx context.Context, issueID int64, commentID *int64, uploadedBy int64, originalName, storageKey, resourceType, mimeType, publicURL string, fileSize int64) (sqlc.CreateAttachmentRow, error)
 	GetAttachmentByID(ctx context.Context, id int64) (sqlc.GetAttachmentByIDRow, error)
 	ListCommentAttachments(ctx context.Context, commentID int64) ([]sqlc.ListCommentAttachmentsRow, error)
 	ListIssueAttachments(ctx context.Context, issueID int64) ([]sqlc.ListIssueAttachmentsRow, error)
@@ -31,6 +31,22 @@ type IssueAttachmentService struct {
 	storage         storage.Storage
 	deleteQueue     queue.AttachmentDeleteQueue
 	authz           AuthzService
+}
+
+func (s *IssueAttachmentService) attachmentURL(storageKey, resourceType, originalName string) (string, error) {
+	return s.storage.PublicURL(storageKey, resourceType, filepath.Ext(originalName))
+}
+
+func (s *IssueAttachmentService) responseURL(publicURL, storageKey, resourceType, originalName string) string {
+	if publicURL != "" {
+		return publicURL
+	}
+
+	url, err := s.attachmentURL(storageKey, resourceType, originalName)
+	if err != nil {
+		return ""
+	}
+	return url
 }
 
 func NewIssueAttachmentsService(repo IssueAttachmentRepo, issueLookupRepo IssueLookupRepo, commentRepo CommentRepo, storage storage.Storage, deleteQueue queue.AttachmentDeleteQueue, authz AuthzService) *IssueAttachmentService {
@@ -102,7 +118,7 @@ func (s *IssueAttachmentService) CreateAttachment(ctx context.Context, requester
 		}
 	}
 
-	attachment, err := s.repo.CreateAttachment(ctx, issueID, commentID, requesterID, header.Filename, uploadResult.StorageKey, uploadResult.ResourceType, uploadResult.MIMEType, uploadResult.Size)
+	attachment, err := s.repo.CreateAttachment(ctx, issueID, commentID, requesterID, header.Filename, uploadResult.StorageKey, uploadResult.ResourceType, uploadResult.MIMEType, uploadResult.PublicURL, uploadResult.Size)
 	if err != nil {
 		job := queue.AttachmentDeleteJob{
 			IssueID:      issueID,
@@ -138,6 +154,7 @@ func (s *IssueAttachmentService) CreateAttachment(ctx context.Context, requester
 		UploadedBy:   attachment.UploadedBy,
 		OriginalName: attachment.OriginalName,
 		ResourceType: attachment.ResourceType,
+		URL:          s.responseURL(attachment.PublicUrl, attachment.StorageKey, attachment.ResourceType, attachment.OriginalName),
 		MimeType:     attachment.MimeType,
 		FileSize:     attachment.FileSize,
 		CreatedAt:    attachment.CreatedAt.Time,
@@ -178,6 +195,7 @@ func (s *IssueAttachmentService) GetAttachmentByID(ctx context.Context, requeste
 		OriginalName: attachment.OriginalName,
 		MimeType:     attachment.MimeType,
 		ResourceType: attachment.ResourceType,
+		URL:          s.responseURL(attachment.PublicUrl, attachment.StorageKey, attachment.ResourceType, attachment.OriginalName),
 		FileSize:     attachment.FileSize,
 		CreatedAt:    attachment.CreatedAt.Time,
 	}, nil
@@ -224,6 +242,7 @@ func (s *IssueAttachmentService) ListIssueAttachments(ctx context.Context, reque
 			OriginalName: a.OriginalName,
 			MimeType:     a.MimeType,
 			ResourceType: a.ResourceType,
+			URL:          s.responseURL(a.PublicUrl, a.StorageKey, a.ResourceType, a.OriginalName),
 			FileSize:     a.FileSize,
 			CreatedAt:    a.CreatedAt.Time,
 		})
@@ -280,6 +299,7 @@ func (s *IssueAttachmentService) ListCommentAttachments(ctx context.Context, req
 			OriginalName: a.OriginalName,
 			MimeType:     a.MimeType,
 			ResourceType: a.ResourceType,
+			URL:          s.responseURL(a.PublicUrl, a.StorageKey, a.ResourceType, a.OriginalName),
 			FileSize:     a.FileSize,
 			CreatedAt:    a.CreatedAt.Time,
 		})

@@ -6,16 +6,17 @@ INSERT INTO issue_attachments(
     original_name, 
     storage_key, 
     resource_type, 
-    mime_type, 
-    file_size
+    mime_type,
+    file_size,
+    public_url
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8
+    $1, $2, $3, $4, $5, $6, $7, $8, $9
 )
-RETURNING id, issue_id, comment_id, uploaded_by, original_name, storage_key, resource_type, mime_type, file_size, created_at, deleted_at;
+RETURNING id, issue_id, comment_id, uploaded_by, original_name, storage_key, resource_type, mime_type, file_size, public_url, created_at, deleted_at;
 
 
 -- name: GetAttachmentByID :one
-SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.created_at, ia.deleted_at,
+SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.public_url, ia.created_at, ia.deleted_at,
     uploader.fullname AS uploader_name, uploader.username AS uploader_username
 FROM issue_attachments ia
 JOIN users uploader ON ia.uploaded_by = uploader.id
@@ -23,7 +24,7 @@ WHERE ia.id = $1 AND ia.deleted_at IS NULL;
 
 
 -- name: ListIssueAttachments :many
-SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.created_at,
+SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.public_url, ia.created_at,
     uploader.fullname AS uploader_name, uploader.username AS uploader_username
 FROM issue_attachments ia
 JOIN users uploader ON ia.uploaded_by = uploader.id
@@ -32,7 +33,7 @@ ORDER BY ia.created_at ASC;
 
 
 -- name: ListCommentAttachments :many
-SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.created_at,
+SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.public_url, ia.created_at,
     uploader.fullname AS uploader_name, uploader.username AS uploader_username
 FROM issue_attachments ia
 JOIN users uploader ON ia.uploaded_by = uploader.id

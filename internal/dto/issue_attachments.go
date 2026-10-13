@@ -11,6 +11,7 @@ type AttachmentResponse struct {
 	OriginalName string    `json:"original_name"`
 	MimeType     string    `json:"mime_type"`
 	ResourceType string    `json:"resource_type"`
+	URL          string    `json:"url"`
 	FileSize     int64     `json:"file_size"`
 	CreatedAt    time.Time `json:"created_at"`
 }
