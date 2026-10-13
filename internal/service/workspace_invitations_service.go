@@ -282,7 +282,7 @@ func (s *WorkspaceInvitationService) CancelInvitation(ctx context.Context, invit
 		return dto.WorkspaceInvitationResponse{}, err
 	}
 
-	invitation, err := s.workspaceInvitationRepo.CancelInvitation(ctx, getInv.ID, requesterID)
+	invitation, err := s.workspaceInvitationRepo.CancelInvitation(ctx, getInv.ID, getInv.InvitedBy)
 	if err != nil {
 		if errors.Is(err, repository.ErrInvitationNotFound) {
 			return dto.WorkspaceInvitationResponse{}, ErrInvitationNotFound

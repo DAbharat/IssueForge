@@ -45,7 +45,7 @@ func registerWorkspaceInvitationsRoutes(r *mux.Router, workspaceInvitationsHandl
 		),
 	).Methods("POST")
 
-	r.Handle("/api/invitations/{invitationID}/decline",
+	r.Handle("/api/invitations/{invitationID}/cancel",
 		authMiddleware.Authenticate(
 			createRateLimit.Limit(http.HandlerFunc(workspaceInvitationsHandler.CancelInvitation)),
 		),
