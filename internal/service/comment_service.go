@@ -15,7 +15,7 @@ type CommentRepo interface {
 	CreateComment(ctx context.Context, issueID, requesterID int64, parentCommentID *int64, content string) (sqlc.Comment, error)
 	GetCommentByID(ctx context.Context, commentID int64) (sqlc.GetCommentByIDRow, error)
 	ListIssueComments(ctx context.Context, issueID int64, limit, offset int32) ([]sqlc.ListIssueCommentsRow, error)
-	UpdateComment(ctx context.Context, commentID int64, content string) (sqlc.Comment, error)
+	UpdateComment(ctx context.Context, commentID, authorID int64, content string) (sqlc.Comment, error)
 	DeleteComment(ctx context.Context, commentID int64) (int64, error)
 }
 
@@ -228,7 +228,7 @@ func (s *CommentService) UpdateComment(ctx context.Context, commentID, requester
 	}
 
 	oldComment := dbComment.Content
-	comment, err := s.repo.UpdateComment(ctx, commentID, commentContent)
+	comment, err := s.repo.UpdateComment(ctx, commentID, requesterID, commentContent)
 	if err != nil {
 		if errors.Is(err, repository.ErrCommentNotFound) {
 			return dto.CommentResponse{}, ErrCommentNotFound

@@ -82,10 +82,11 @@ func (r *CommentRepository) ListIssueComments(ctx context.Context, issueID int64
 	return comments, nil
 }
 
-func (r *CommentRepository) UpdateComment(ctx context.Context, id int64, content string) (sqlc.Comment, error) {
+func (r *CommentRepository) UpdateComment(ctx context.Context, id, authorID int64, content string) (sqlc.Comment, error) {
 	params := sqlc.UpdateCommentParams{
-		ID:      id,
-		Content: content,
+		ID:       id,
+		AuthorID: authorID,
+		Content:  content,
 	}
 
 	comment, err := r.queries.UpdateComment(ctx, params)
