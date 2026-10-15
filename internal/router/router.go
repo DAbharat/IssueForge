@@ -19,6 +19,7 @@ func New(userHandler *handler.UserHandler,
 	issueAttachmentsHandler *handler.IssueAttachmentsHandler,
 	labelsHandler *handler.LabelsHandler,
 	workspaceInvitationsHandler *handler.WorkspaceInvitationHandler,
+	archiveHandler *handler.ArchiveHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	reg *prometheus.Registry,
 	strictRateLimit *middleware.RateLimitMiddleware,
@@ -46,6 +47,7 @@ func New(userHandler *handler.UserHandler,
 	registerIssueAttachmentsRoutes(r, issueAttachmentsHandler, authMiddleware, attachmentRateLimit, readRateLimit)
 	registerLabelsRoutes(r, labelsHandler, authMiddleware)
 	registerWorkspaceInvitationsRoutes(r, workspaceInvitationsHandler, createRateLimit, readRateLimit, authMiddleware)
+	registerArchiveRoutes(r, archiveHandler, authMiddleware, readRateLimit)
 
 	metrics := middleware.NewMetricsMiddleware(reg)
 	r.Use(metrics.Metrics)

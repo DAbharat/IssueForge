@@ -186,3 +186,26 @@ func (r *ProjectRepository) ListProjectsByLead(ctx context.Context, workspaceID 
 
 	return projects, nil
 }
+
+func (r *ProjectRepository) GetProjectByIDIncludingDeleted(ctx context.Context, id int64) (sqlc.GetProjectByIDIncludingDeletedRow, error) {
+	project, err := r.queries.GetProjectByIDIncludingDeleted(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.GetProjectByIDIncludingDeletedRow{}, ErrProjectNotFound
+		}
+		return sqlc.GetProjectByIDIncludingDeletedRow{}, fmt.Errorf("get project by id including deleted: %w", err)
+	}
+	return project, nil
+}
+
+func (r *ProjectRepository) RestoreProject(ctx context.Context, id int64) (sqlc.Project, error) {
+	project, err := r.queries.RestoreProject(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.Project{}, ErrProjectNotFound
+		}
+		return sqlc.Project{}, fmt.Errorf("restore project: %w", err)
+	}
+	return project, nil
+}
+

@@ -567,6 +567,8 @@ func (h *IssueHandler) RestoreDeletedIssue(w http.ResponseWriter, r *http.Reques
 			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
 		case errors.Is(err, service.ErrIssueNotFound):
 			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
+		case errors.Is(err, service.ErrParentProjectDeleted), errors.Is(err, service.ErrParentWorkspaceDeleted):
+			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
 		default:
 			log.Printf("restore deleted issue fail: %v", err)
 			httpx.RespondWithError(w, http.StatusInternalServerError, err.Error())

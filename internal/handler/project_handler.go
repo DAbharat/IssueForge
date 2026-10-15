@@ -23,6 +23,7 @@ type ProjectService interface {
 	UpdateProjectLead(ctx context.Context, requesterID int64, req dto.UpdateProjectLeadRequest, projectID int64) (dto.ProjectResponse, error)
 	DeleteProject(ctx context.Context, requesterID, projectID int64) (dto.ProjectResponse, error)
 	ListProjectsByLead(ctx context.Context, requesterID, workspaceID int64, leadID *int64) ([]dto.ProjectResponse, error)
+	RestoreProject(ctx context.Context, requesterID, projectID int64) (dto.ProjectResponse, error)
 }
 
 type ProjectHandler struct {
@@ -292,4 +293,36 @@ func (h *ProjectHandler) ListProjectByLead(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	httpx.RespondWithJSON(w, http.StatusOK, projects)
+}
+
+func (h *ProjectHandler) RestoreProject(w http.ResponseWriter, r *http.Request) {
+	requesterID, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	vars := mux.Vars(r)
+	projectID, err := strconv.ParseInt(vars["projectID"], 10, 64)
+	if err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidProjectID.Error())
+		return
+	}
+
+	project, err := h.projectService.RestoreProject(r.Context(), requesterID, projectID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
+		case errors.Is(err, service.ErrProjectNotFound):
+			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
+		case errors.Is(err, service.ErrParentWorkspaceDeleted):
+			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
+		default:
+			log.Printf("restore project fail: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+	httpx.RespondWithJSON(w, http.StatusOK, project)
 }

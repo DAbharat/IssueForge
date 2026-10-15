@@ -107,6 +107,46 @@ func (q *Queries) GetProjectByID(ctx context.Context, id int64) (GetProjectByIDR
 	return i, err
 }
 
+const getProjectByIDIncludingDeleted = `-- name: GetProjectByIDIncludingDeleted :one
+SELECT p.id, p.workspace_id, p.lead_id, p.name, p.description, p.created_at, p.updated_at, p.deleted_at,
+    u.fullname as lead_name, w.deleted_at as workspace_deleted_at
+FROM projects p
+JOIN users u ON p.lead_id = u.id
+JOIN workspaces w ON p.workspace_id = w.id
+WHERE p.id = $1
+`
+
+type GetProjectByIDIncludingDeletedRow struct {
+	ID                 int64              `json:"id"`
+	WorkspaceID        int64              `json:"workspace_id"`
+	LeadID             int64              `json:"lead_id"`
+	Name               string             `json:"name"`
+	Description        string             `json:"description"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt          pgtype.Timestamptz `json:"deleted_at"`
+	LeadName           string             `json:"lead_name"`
+	WorkspaceDeletedAt pgtype.Timestamptz `json:"workspace_deleted_at"`
+}
+
+func (q *Queries) GetProjectByIDIncludingDeleted(ctx context.Context, id int64) (GetProjectByIDIncludingDeletedRow, error) {
+	row := q.db.QueryRow(ctx, getProjectByIDIncludingDeleted, id)
+	var i GetProjectByIDIncludingDeletedRow
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.LeadID,
+		&i.Name,
+		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.LeadName,
+		&i.WorkspaceDeletedAt,
+	)
+	return i, err
+}
+
 const isProjectLead = `-- name: IsProjectLead :one
 SELECT EXISTS (
     SELECT 1
@@ -180,6 +220,29 @@ func (q *Queries) ListProjectsByLead(ctx context.Context, arg ListProjectsByLead
 		return nil, err
 	}
 	return items, nil
+}
+
+const restoreProject = `-- name: RestoreProject :one
+UPDATE projects
+SET deleted_at = NULL
+WHERE id = $1 AND deleted_at IS NOT NULL
+RETURNING id, workspace_id, lead_id, name, description, created_at, updated_at, deleted_at
+`
+
+func (q *Queries) RestoreProject(ctx context.Context, id int64) (Project, error) {
+	row := q.db.QueryRow(ctx, restoreProject, id)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.LeadID,
+		&i.Name,
+		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
 }
 
 const updateProjectDetails = `-- name: UpdateProjectDetails :one

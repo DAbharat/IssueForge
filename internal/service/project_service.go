@@ -20,6 +20,8 @@ type ProjectRepo interface {
 	UpdateProjectLead(ctx context.Context, leadID *int64, projectID int64) (sqlc.Project, error)
 	DeleteProject(ctx context.Context, id int64) (sqlc.DeleteProjectRow, error)
 	ListProjectsByLead(ctx context.Context, workspaceID int64, leadID *int64) ([]sqlc.ListProjectsByLeadRow, error)
+	GetProjectByIDIncludingDeleted(ctx context.Context, projectID int64) (sqlc.GetProjectByIDIncludingDeletedRow, error)
+	RestoreProject(ctx context.Context, id int64) (sqlc.Project, error)
 }
 
 type ProjectService struct {
@@ -292,7 +294,55 @@ func (s *ProjectService) ListProjectsByLead(ctx context.Context, requesterID, wo
 			LeadName:    p.LeadName,
 			Name:        p.Name,
 			Description: p.Description,
+			CreatedAt:   p.CreatedAt.Time,
+			UpdatedAt:   p.UpdatedAt.Time,
 		})
 	}
 	return projects, nil
+}
+
+func (s *ProjectService) RestoreProject(ctx context.Context, requesterID, projectID int64) (dto.ProjectResponse, error) {
+	if projectID <= 0 {
+		return dto.ProjectResponse{}, ErrInvalidProjectID
+	}
+
+	dbProject, err := s.projectRepo.GetProjectByIDIncludingDeleted(ctx, projectID)
+	if err != nil {
+		if errors.Is(err, repository.ErrProjectNotFound) {
+			return dto.ProjectResponse{}, ErrProjectNotFound
+		}
+		return dto.ProjectResponse{}, fmt.Errorf("get project by id including deleted: %w", err)
+	}
+
+	isProjectLead := s.authz.RequireProjectLead(ctx, dbProject.ID, requesterID) == nil
+	isWorkspaceAdmin := s.authz.RequireWorkspaceAdminIncludingDeleted(ctx, dbProject.WorkspaceID, requesterID) == nil
+
+	if !isProjectLead && !isWorkspaceAdmin {
+		return dto.ProjectResponse{}, ErrForbidden
+	}
+
+	if dbProject.WorkspaceDeletedAt.Valid {
+		return dto.ProjectResponse{}, ErrParentWorkspaceDeleted
+	}
+
+	project, err := s.projectRepo.RestoreProject(ctx, dbProject.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrProjectNotFound) {
+			return dto.ProjectResponse{}, ErrProjectNotFound
+		}
+		return dto.ProjectResponse{}, fmt.Errorf("restore project: %w", err)
+	}
+
+	s.invalidateProjectCache(ctx, project.ID)
+
+	return dto.ProjectResponse{
+		ID:          project.ID,
+		WorkspaceID: project.WorkspaceID,
+		LeadID:      project.LeadID,
+		LeadName:    dbProject.LeadName,
+		Name:        project.Name,
+		Description: project.Description,
+		CreatedAt:   project.CreatedAt.Time,
+		UpdatedAt:   project.UpdatedAt.Time,
+	}, nil
 }

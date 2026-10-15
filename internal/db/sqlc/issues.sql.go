@@ -131,6 +131,68 @@ func (q *Queries) GetIssueByID(ctx context.Context, id int64) (GetIssueByIDRow, 
 	return i, err
 }
 
+const getIssueByIDIncludingDeleted = `-- name: GetIssueByIDIncludingDeleted :one
+SELECT i.id, i.project_id, i.created_by, i.assigned_to, i.title, i.description, i.status, i.priority, i.created_at, i.updated_at, i.due_date, i.deleted_at,
+       creator.fullname AS creator_name, creator.username AS creator_username,
+       assignee.fullname AS assignee_name, assignee.username AS assignee_username,
+       p.deleted_at AS project_deleted_at, p.workspace_id, w.deleted_at AS workspace_deleted_at
+FROM issues i
+JOIN projects p ON i.project_id = p.id
+JOIN workspaces w ON p.workspace_id = w.id
+JOIN users creator ON i.created_by = creator.id
+LEFT JOIN users assignee ON i.assigned_to = assignee.id
+WHERE i.id = $1
+`
+
+type GetIssueByIDIncludingDeletedRow struct {
+	ID                 int64              `json:"id"`
+	ProjectID          int64              `json:"project_id"`
+	CreatedBy          int64              `json:"created_by"`
+	AssignedTo         pgtype.Int8        `json:"assigned_to"`
+	Title              string             `json:"title"`
+	Description        string             `json:"description"`
+	Status             IssueStatus        `json:"status"`
+	Priority           IssuePriority      `json:"priority"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	DueDate            pgtype.Timestamptz `json:"due_date"`
+	DeletedAt          pgtype.Timestamptz `json:"deleted_at"`
+	CreatorName        string             `json:"creator_name"`
+	CreatorUsername    string             `json:"creator_username"`
+	AssigneeName       pgtype.Text        `json:"assignee_name"`
+	AssigneeUsername   pgtype.Text        `json:"assignee_username"`
+	ProjectDeletedAt   pgtype.Timestamptz `json:"project_deleted_at"`
+	WorkspaceID        int64              `json:"workspace_id"`
+	WorkspaceDeletedAt pgtype.Timestamptz `json:"workspace_deleted_at"`
+}
+
+func (q *Queries) GetIssueByIDIncludingDeleted(ctx context.Context, id int64) (GetIssueByIDIncludingDeletedRow, error) {
+	row := q.db.QueryRow(ctx, getIssueByIDIncludingDeleted, id)
+	var i GetIssueByIDIncludingDeletedRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.CreatedBy,
+		&i.AssignedTo,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.Priority,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DueDate,
+		&i.DeletedAt,
+		&i.CreatorName,
+		&i.CreatorUsername,
+		&i.AssigneeName,
+		&i.AssigneeUsername,
+		&i.ProjectDeletedAt,
+		&i.WorkspaceID,
+		&i.WorkspaceDeletedAt,
+	)
+	return i, err
+}
+
 const getIssueProjectID = `-- name: GetIssueProjectID :one
 SELECT project_id
 FROM issues

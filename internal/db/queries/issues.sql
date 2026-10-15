@@ -109,3 +109,16 @@ UPDATE issues
 SET deleted_at = NULL
 WHERE id = $1 AND deleted_at IS NOT NULL
 RETURNING id, project_id, created_by, assigned_to, title, description, status, priority, created_at, updated_at, deleted_at, due_date;
+
+
+-- name: GetIssueByIDIncludingDeleted :one
+SELECT i.id, i.project_id, i.created_by, i.assigned_to, i.title, i.description, i.status, i.priority, i.created_at, i.updated_at, i.due_date, i.deleted_at,
+       creator.fullname AS creator_name, creator.username AS creator_username,
+       assignee.fullname AS assignee_name, assignee.username AS assignee_username,
+       p.deleted_at AS project_deleted_at, p.workspace_id, w.deleted_at AS workspace_deleted_at
+FROM issues i
+JOIN projects p ON i.project_id = p.id
+JOIN workspaces w ON p.workspace_id = w.id
+JOIN users creator ON i.created_by = creator.id
+LEFT JOIN users assignee ON i.assigned_to = assignee.id
+WHERE i.id = $1;

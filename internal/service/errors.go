@@ -64,4 +64,7 @@ var (
 	ErrPendingInvitationExists       = errors.New("a pending invitation already exists")
 	ErrInvalidInvitationID           = errors.New("invalid invitation id")
 	ErrInvitationNotFound            = errors.New("invitation not found")
+	ErrParentWorkspaceDeleted        = errors.New("cannot restore: parent workspace is archived. Please restore the workspace first.")
+	ErrParentProjectDeleted          = errors.New("cannot restore: parent project is archived. Please restore the project first.")
 )
+

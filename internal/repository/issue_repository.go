@@ -273,3 +273,15 @@ func (r *IssueRepository) RestoreDeletedIssue(ctx context.Context, id int64) (sq
 	}
 	return issue, nil
 }
+
+func (r *IssueRepository) GetIssueByIDIncludingDeleted(ctx context.Context, id int64) (sqlc.GetIssueByIDIncludingDeletedRow, error) {
+	issue, err := r.queries.GetIssueByIDIncludingDeleted(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.GetIssueByIDIncludingDeletedRow{}, ErrIssueNotFound
+		}
+		return sqlc.GetIssueByIDIncludingDeletedRow{}, fmt.Errorf("get issue by id including deleted: %w", err)
+	}
+	return issue, nil
+}
+

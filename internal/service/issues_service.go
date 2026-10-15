@@ -27,6 +27,7 @@ type IssueRepo interface {
 	ListCreatedIssues(ctx context.Context, createdBy int64) ([]sqlc.ListCreatedIssuesRow, error)
 	DeleteIssue(ctx context.Context, issueID int64) (int64, error)
 	RestoreDeletedIssue(ctx context.Context, issueID int64) (sqlc.Issue, error)
+	GetIssueByIDIncludingDeleted(ctx context.Context, issueID int64) (sqlc.GetIssueByIDIncludingDeletedRow, error)
 }
 
 type ActivityService interface {
@@ -787,11 +788,16 @@ func (s *IssueService) DeleteIssue(ctx context.Context, requesterID, issueID int
 
 	dbIssue, err := s.repo.GetIssueByID(ctx, issueID)
 	if err != nil {
+		if errors.Is(err, repository.ErrIssueNotFound) {
+			return 0, ErrIssueNotFound
+		}
 		return 0, err
 	}
 
-	if err := s.authz.RequireProjectLead(ctx, dbIssue.ProjectID, requesterID); err != nil {
-		return 0, err
+	isCreator := requesterID == dbIssue.CreatedBy
+	isLead := s.authz.RequireProjectLead(ctx, dbIssue.ProjectID, requesterID) == nil
+	if !isCreator && !isLead {
+		return 0, ErrForbidden
 	}
 
 	id, err := s.repo.DeleteIssue(ctx, issueID)
@@ -816,7 +822,7 @@ func (s *IssueService) RestoreDeletedIssue(ctx context.Context, requesterID, iss
 		return dto.IssueResponse{}, ErrInvalidIssueID
 	}
 
-	dbIssue, err := s.repo.GetIssueByID(ctx, issueID)
+	dbIssue, err := s.repo.GetIssueByIDIncludingDeleted(ctx, issueID)
 	if err != nil {
 		if errors.Is(err, repository.ErrIssueNotFound) {
 			return dto.IssueResponse{}, ErrIssueNotFound
@@ -826,9 +832,17 @@ func (s *IssueService) RestoreDeletedIssue(ctx context.Context, requesterID, iss
 
 	isCreator := requesterID == dbIssue.CreatedBy
 	isLead := s.authz.RequireProjectLead(ctx, dbIssue.ProjectID, requesterID) == nil
+	isWorkspaceAdmin := s.authz.RequireWorkspaceAdminIncludingDeleted(ctx, dbIssue.WorkspaceID, requesterID) == nil
 
-	if !isCreator && !isLead {
+	if !isCreator && !isLead && !isWorkspaceAdmin {
 		return dto.IssueResponse{}, ErrForbidden
+	}
+
+	if dbIssue.ProjectDeletedAt.Valid {
+		return dto.IssueResponse{}, ErrParentProjectDeleted
+	}
+	if dbIssue.WorkspaceDeletedAt.Valid {
+		return dto.IssueResponse{}, ErrParentWorkspaceDeleted
 	}
 
 	issue, err := s.repo.RestoreDeletedIssue(ctx, dbIssue.ID)

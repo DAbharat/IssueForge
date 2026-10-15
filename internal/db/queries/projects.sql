@@ -57,3 +57,19 @@ SELECT EXISTS (
     FROM projects
     WHERE id = $1 AND lead_id = $2 AND deleted_at IS NULL
 );
+
+
+-- name: GetProjectByIDIncludingDeleted :one
+SELECT p.id, p.workspace_id, p.lead_id, p.name, p.description, p.created_at, p.updated_at, p.deleted_at,
+    u.fullname as lead_name, w.deleted_at as workspace_deleted_at
+FROM projects p
+JOIN users u ON p.lead_id = u.id
+JOIN workspaces w ON p.workspace_id = w.id
+WHERE p.id = $1;
+
+
+-- name: RestoreProject :one
+UPDATE projects
+SET deleted_at = NULL
+WHERE id = $1 AND deleted_at IS NOT NULL
+RETURNING id, workspace_id, lead_id, name, description, created_at, updated_at, deleted_at;

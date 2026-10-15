@@ -168,6 +168,10 @@ func main() {
 	workspaceInvitationService := service.NewWorkspaceInvitationService(workspaceInvitationRepo, workspaceInvitationCache, authzService)
 	workspaceInvitationHandler := handler.NewWorkspaceInvitationHandler(workspaceInvitationService)
 
+	archiveRepo := repository.NewArchiveRepository(queries)
+	archiveService := service.NewArchiveService(archiveRepo)
+	archiveHandler := handler.NewArchiveHandler(archiveService)
+
 	r := router.New(userHandler,
 		projectHandler,
 		projectMemberHandler,
@@ -179,6 +183,7 @@ func main() {
 		issueAttachmentsHandler,
 		labelsHandler,
 		workspaceInvitationHandler,
+		archiveHandler,
 		authMiddleware,
 		reg,
 		strictRateLimit,

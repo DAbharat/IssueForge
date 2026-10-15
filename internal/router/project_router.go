@@ -42,4 +42,8 @@ func registerProjectRoutes(r *mux.Router, projectHandler *handler.ProjectHandler
 			readRateLimit.Limit(http.HandlerFunc(projectHandler.ListProjectByLead)),
 		),
 	).Methods("GET")
+
+	r.Handle("/api/projects/{projectID}/restore",
+		authMiddleware.Authenticate(http.HandlerFunc(projectHandler.RestoreProject)),
+	).Methods("POST")
 }
