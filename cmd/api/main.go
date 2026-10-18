@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -197,10 +198,20 @@ func main() {
 		patchRateLimit,
 	)
 
+	corsOrigins := []string{"http://localhost:3000", "http://localhost:4000"}
+	if envOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); envOrigins != "" {
+		for _, o := range strings.Split(envOrigins, ",") {
+			trimmed := strings.TrimSpace(o)
+			if trimmed != "" {
+				corsOrigins = append(corsOrigins, trimmed)
+			}
+		}
+	}
+
 	corsHandler := handlers.CORS(
-		handlers.AllowedOrigins([]string{"http://localhost:4000"}),
+		handlers.AllowedOrigins(corsOrigins),
 		handlers.AllowedMethods([]string{"POST", "GET", "PATCH", "PUT", "DELETE", "OPTIONS"}),
-		handlers.AllowedHeaders([]string{"Content-Type", "Authorization"}),
+		handlers.AllowedHeaders([]string{"Content-Type", "Authorization", "Accept", "X-Requested-With"}),
 		handlers.AllowCredentials(),
 	)
 
