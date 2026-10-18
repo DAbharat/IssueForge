@@ -10,12 +10,18 @@ import (
 )
 
 func New(cfg *config.Config) (*pgxpool.Pool, error) {
-	connString := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+	sslMode := cfg.DBSSLMode
+	if sslMode == "" {
+		sslMode = "disable"
+	}
+
+	connString := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
 		cfg.DBUser,
 		cfg.DBPassword,
 		cfg.DBHost,
 		cfg.DBPort,
 		cfg.DBName,
+		sslMode,
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

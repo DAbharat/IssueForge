@@ -14,6 +14,7 @@ type Config struct {
 	DBUser              string
 	DBPassword          string
 	DBName              string
+	DBSSLMode           string
 	JWTSecret           string
 	CloudinaryURL       string
 	CloudinaryCloudName string
@@ -53,12 +54,21 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid REFRESH_TOKEN_TTL: %w", err)
 	}
 
+	sslMode := os.Getenv("DB_SSLMODE")
+	if sslMode == "" {
+		sslMode = os.Getenv("DB_SSL_MODE")
+	}
+	if sslMode == "" {
+		sslMode = "disable"
+	}
+
 	cfg := &Config{
 		DBHost:              os.Getenv("DB_HOST"),
 		DBPort:              port,
 		DBUser:              os.Getenv("DB_USER"),
 		DBPassword:          os.Getenv("DB_PASSWORD"),
 		DBName:              os.Getenv("DB_NAME"),
+		DBSSLMode:           sslMode,
 		JWTSecret:           os.Getenv("JWTSecret"),
 		CloudinaryURL:       os.Getenv("CLOUDINARY_URL"),
 		CloudinaryCloudName: os.Getenv("CLOUDINARY_CLOUD_NAME"),
