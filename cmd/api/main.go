@@ -198,20 +198,45 @@ func main() {
 		patchRateLimit,
 	)
 
-	corsOrigins := []string{"http://localhost:3000", "http://localhost:4000"}
+	corsOrigins := []string{
+		"http://localhost:3000",
+		"http://localhost:4000",
+		"https://issue-forge-frontend.vercel.app",
+	}
 	if envOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); envOrigins != "" {
+		corsOrigins = corsOrigins[:0]
 		for _, o := range strings.Split(envOrigins, ",") {
-			trimmed := strings.TrimSpace(o)
+			trimmed := strings.TrimRight(strings.TrimSpace(o), "/")
 			if trimmed != "" {
 				corsOrigins = append(corsOrigins, trimmed)
 			}
 		}
 	}
 
+	normalizeOrigin := func(s string) string {
+		return strings.TrimRight(strings.ToLower(strings.TrimSpace(s)), "/")
+	}
+	allowedOrigins := make(map[string]struct{}, len(corsOrigins))
+	for _, o := range corsOrigins {
+		if n := normalizeOrigin(o); n != "" {
+			allowedOrigins[n] = struct{}{}
+		}
+	}
+
+	originValidator := func(origin string) bool {
+		originClean := normalizeOrigin(origin)
+		if originClean == "" {
+			return false
+		}
+		_, ok := allowedOrigins[originClean]
+		return ok
+	}
+
 	corsHandler := handlers.CORS(
-		handlers.AllowedOrigins(corsOrigins),
-		handlers.AllowedMethods([]string{"POST", "GET", "PATCH", "PUT", "DELETE", "OPTIONS"}),
-		handlers.AllowedHeaders([]string{"Content-Type", "Authorization", "Accept", "X-Requested-With"}),
+		handlers.AllowedOriginValidator(originValidator),
+		handlers.AllowedMethods([]string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}),
+		handlers.AllowedHeaders([]string{"Content-Type", "Authorization", "Accept", "X-Requested-With", "Origin"}),
+		handlers.ExposedHeaders([]string{"Content-Length", "Content-Type"}),
 		handlers.AllowCredentials(),
 	)
 
