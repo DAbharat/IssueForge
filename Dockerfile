@@ -11,8 +11,12 @@ RUN go build -o issueforge ./cmd/api
 
 FROM alpine:3.22
 
+RUN apk add --no-cache redis bash
+
+WORKDIR /app
+
 COPY --from=builder /app/issueforge .
 
 EXPOSE 8080
 
-CMD [ "./issueforge" ]
+CMD sh -c "redis-server --daemonize yes && until redis-cli ping > /dev/null 2>&1; do sleep 0.1; done; ./issueforge"
