@@ -108,3 +108,75 @@ func (r *UserRepository) DeleteUser(ctx context.Context, id int64) (int64, error
 	}
 	return id, nil
 }
+
+func (r *UserRepository) GetUserByGoogleSub(ctx context.Context, sub *string) (sqlc.GetUserByGoogleSubRow, error) {
+	var newSub pgtype.Text
+	if sub != nil {
+		newSub.String = *sub
+		newSub.Valid = true
+	}
+
+	user, err := r.queries.GetUserByGoogleSub(ctx, newSub)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.GetUserByGoogleSubRow{}, ErrUserNotFound
+		}
+		return sqlc.GetUserByGoogleSubRow{}, fmt.Errorf("get user by google sub: %w", err)
+	}
+
+	return user, nil
+}
+
+func (r *UserRepository) CreateOIDCUser(ctx context.Context, email, fullname, username, passwordHash string, googleSub *string) (sqlc.CreateOIDCUserRow, error) {
+	var newSub pgtype.Text
+	if googleSub != nil {
+		newSub.String = *googleSub
+		newSub.Valid = true
+	}
+
+	params := sqlc.CreateOIDCUserParams{
+		Email:        email,
+		Fullname:     fullname,
+		Username:     username,
+		PasswordHash: passwordHash,
+		GoogleSub:    newSub,
+	}
+
+	user, err := r.queries.CreateOIDCUser(ctx, params)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			switch pgErr.ConstraintName {
+			case "users_email_key":
+				return sqlc.CreateOIDCUserRow{}, ErrDuplicateEmail
+			case "users_username_unique":
+				return sqlc.CreateOIDCUserRow{}, ErrDuplicateUsername
+			case "users_google_sub_key":
+				return sqlc.CreateOIDCUserRow{}, ErrDuplicateGoogleSub
+			}
+		}
+		return sqlc.CreateOIDCUserRow{}, fmt.Errorf("create oidc user: %w", err)
+	}
+
+	return user, nil
+}
+
+func (r *UserRepository) BindGoogleSub(ctx context.Context, id int64, sub *string) (int64, error) {
+	var newSub pgtype.Text
+	if sub != nil {
+		newSub.String = *sub
+		newSub.Valid = true
+	}
+
+	params := sqlc.BindGoogleSubParams{
+		ID:        id,
+		GoogleSub: newSub,
+	}
+
+	id, err := r.queries.BindGoogleSub(ctx, params)
+	if err != nil {
+		return 0, fmt.Errorf("bind google sub: %w", err)
+	}
+
+	return id, nil
+}

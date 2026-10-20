@@ -7,6 +7,8 @@ import (
 	"IssueForge/internal/repository"
 	"IssueForge/internal/service"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -26,6 +28,8 @@ type UserService interface {
 	GetUserByUsername(ctx context.Context, username string) (dto.UserResponse, error)
 	SearchUserByUsername(ctx context.Context, search *string) ([]dto.UserResponse, error)
 	DeleteUser(ctx context.Context, id int64) (int64, error)
+	GoogleAuthURL(state string) (string, error)
+	GoogleLogin(ctx context.Context, code string) (dto.LoginUserResponse, error)
 }
 
 type UserHandler struct {
@@ -274,4 +278,85 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.RespondWithJSON(w, http.StatusOK, user)
+}
+
+func (h *UserHandler) GoogleLoginStart(w http.ResponseWriter, r *http.Request) {
+	stateBytes := make([]byte, 32)
+	if _, err := rand.Read(stateBytes); err != nil {
+		httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	state := base64.RawURLEncoding.EncodeToString(stateBytes)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "google_oauth_state",
+		Value:    state,
+		Path:     "/api/auth/google",
+		MaxAge:   300,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	url, err := h.userService.GoogleAuthURL(state)
+	if err != nil {
+		log.Printf("start google login fail: %v", err)
+		httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	http.Redirect(w, r, url, http.StatusFound)
+}
+
+func (h *UserHandler) GoogleLoginCallback(w http.ResponseWriter, r *http.Request) {
+	stateCookie, err := r.Cookie("google_oauth_state")
+	if err != nil || stateCookie.Value == "" {
+		httpx.RespondWithError(w, http.StatusBadRequest, "invalid oauth state")
+		return
+	}
+
+	defer http.SetCookie(w, &http.Cookie{
+		Name:     "google_oauth_state",
+		Value:    "",
+		Path:     "/api/auth/google",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	state := r.URL.Query().Get("state")
+	if state == "" || state != stateCookie.Value {
+		httpx.RespondWithError(w, http.StatusBadRequest, "invalid oauth state")
+		return
+	}
+
+	if providerErr := r.URL.Query().Get("error"); providerErr != "" {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "google sign-in was not completed")
+		return
+	}
+
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		httpx.RespondWithError(w, http.StatusBadRequest, "missing authorization code")
+		return
+	}
+
+	result, err := h.userService.GoogleLogin(r.Context(), code)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
+		case errors.Is(err, service.ErrDuplicateEmail),
+			errors.Is(err, service.ErrDuplicateUsername):
+			httpx.RespondWithError(w, http.StatusConflict, err.Error())
+		default:
+			log.Printf("google login callback fail: %v", err)
+			httpx.RespondWithError(w, http.StatusUnauthorized, "google sign-in failed")
+		}
+		return
+	}
+
+	httpx.RespondWithJSON(w, http.StatusOK, result)
 }

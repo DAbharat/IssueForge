@@ -4,6 +4,7 @@ go 1.26.4
 
 require (
 	github.com/cloudinary/cloudinary-go/v2 v2.16.0
+	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/go-resty/resty/v2 v2.17.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
@@ -15,6 +16,7 @@ require (
 	github.com/redis/go-redis/v9 v9.21.0
 	go.codycody31.dev/gobullmq v1.1.0
 	golang.org/x/crypto v0.54.0
+	golang.org/x/oauth2 v0.37.0
 )
 
 require (
@@ -22,6 +24,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/creasty/defaults v1.7.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/gorilla/schema v1.4.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

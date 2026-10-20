@@ -53,4 +53,12 @@ func registerUserRoutes(r *mux.Router, userHandler *handler.UserHandler, authMid
 			deleteRateLimit.Limit(http.HandlerFunc(userHandler.DeleteUser)),
 		),
 	).Methods("DELETE")
+
+	r.Handle("/api/auth/google",
+		authRateLimit.Limit(http.HandlerFunc(userHandler.GoogleLoginStart)),
+	).Methods("GET")
+
+	r.Handle("/api/auth/google/callback",
+		http.HandlerFunc(userHandler.GoogleLoginCallback),
+	).Methods("GET")
 }

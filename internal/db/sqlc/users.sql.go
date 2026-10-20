@@ -11,6 +11,69 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const bindGoogleSub = `-- name: BindGoogleSub :one
+UPDATE users
+SET google_sub = $2
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id
+`
+
+type BindGoogleSubParams struct {
+	ID        int64       `json:"id"`
+	GoogleSub pgtype.Text `json:"google_sub"`
+}
+
+func (q *Queries) BindGoogleSub(ctx context.Context, arg BindGoogleSubParams) (int64, error) {
+	row := q.db.QueryRow(ctx, bindGoogleSub, arg.ID, arg.GoogleSub)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const createOIDCUser = `-- name: CreateOIDCUser :one
+INSERT INTO users(
+  email, fullname, username, password_hash, google_sub
+) VALUES (
+  $1, $2, $3, $4, $5
+)
+RETURNING id, email, fullname, username, created_at
+`
+
+type CreateOIDCUserParams struct {
+	Email        string      `json:"email"`
+	Fullname     string      `json:"fullname"`
+	Username     string      `json:"username"`
+	PasswordHash string      `json:"password_hash"`
+	GoogleSub    pgtype.Text `json:"google_sub"`
+}
+
+type CreateOIDCUserRow struct {
+	ID        int64              `json:"id"`
+	Email     string             `json:"email"`
+	Fullname  string             `json:"fullname"`
+	Username  string             `json:"username"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) CreateOIDCUser(ctx context.Context, arg CreateOIDCUserParams) (CreateOIDCUserRow, error) {
+	row := q.db.QueryRow(ctx, createOIDCUser,
+		arg.Email,
+		arg.Fullname,
+		arg.Username,
+		arg.PasswordHash,
+		arg.GoogleSub,
+	)
+	var i CreateOIDCUserRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Fullname,
+		&i.Username,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createOnboardingUser = `-- name: CreateOnboardingUser :one
 INSERT INTO users(
     email,
@@ -68,6 +131,34 @@ func (q *Queries) DeleteUser(ctx context.Context, id int64) (int64, error) {
 	row := q.db.QueryRow(ctx, deleteUser, id)
 	err := row.Scan(&id)
 	return id, err
+}
+
+const getUserByGoogleSub = `-- name: GetUserByGoogleSub :one
+SELECT id, email, username, fullname, password_hash
+FROM users
+WHERE google_sub = $1 AND deleted_at IS NULL
+LIMIT 1
+`
+
+type GetUserByGoogleSubRow struct {
+	ID           int64  `json:"id"`
+	Email        string `json:"email"`
+	Username     string `json:"username"`
+	Fullname     string `json:"fullname"`
+	PasswordHash string `json:"password_hash"`
+}
+
+func (q *Queries) GetUserByGoogleSub(ctx context.Context, googleSub pgtype.Text) (GetUserByGoogleSubRow, error) {
+	row := q.db.QueryRow(ctx, getUserByGoogleSub, googleSub)
+	var i GetUserByGoogleSubRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Username,
+		&i.Fullname,
+		&i.PasswordHash,
+	)
+	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one

@@ -25,11 +25,14 @@ type Config struct {
 	RedisDB             int
 	RedisTTL            time.Duration
 	RefreshTokenTTL     time.Duration
+	GoogleClientID      string
+	GoogleClientSecret  string
+	GoogleRedirectURL   string
 }
 
 func Load() (*Config, error) {
 
-	requiredEnvVars := []string{"DB_HOST", "DB_PASSWORD", "DB_USER", "DB_PORT", "DB_NAME", "JWTSecret", "CLOUDINARY_URL", "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "REDIS_ADDR", "REDIS_DB", "REDIS_TTL", "REFRESH_TOKEN_TTL"}
+	requiredEnvVars := []string{"DB_HOST", "DB_PASSWORD", "DB_USER", "DB_PORT", "DB_NAME", "JWTSecret", "CLOUDINARY_URL", "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET", "REDIS_ADDR", "REDIS_DB", "REDIS_TTL", "REFRESH_TOKEN_TTL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URL"}
 	missingVars := checkMissingENV(requiredEnvVars)
 
 	if len(missingVars) > 0 {
@@ -45,13 +48,13 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid DB_PORT: %w", err)
 	}
 	if redErr != nil {
-		return nil, fmt.Errorf("invalid REDIS_DB: %w", err)
+		return nil, fmt.Errorf("invalid REDIS_DB: %w", redErr)
 	}
 	if redTTLErr != nil {
-		return nil, fmt.Errorf("invalid REDIS_TTL: %w", err)
+		return nil, fmt.Errorf("invalid REDIS_TTL: %w", redTTLErr)
 	}
 	if refreshTokenTTLErr != nil {
-		return nil, fmt.Errorf("invalid REFRESH_TOKEN_TTL: %w", err)
+		return nil, fmt.Errorf("invalid REFRESH_TOKEN_TTL: %w", refreshTokenTTLErr)
 	}
 
 	sslMode := os.Getenv("DB_SSLMODE")
@@ -79,6 +82,9 @@ func Load() (*Config, error) {
 		RedisDB:             redisDB,
 		RedisTTL:            redisTTL,
 		RefreshTokenTTL:     refreshTokenTTL,
+		GoogleClientID:      os.Getenv("GOOGLE_CLIENT_ID"),
+		GoogleClientSecret:  os.Getenv("GOOGLE_CLIENT_SECRET"),
+		GoogleRedirectURL:   os.Getenv("GOOGLE_REDIRECT_URL"),
 	}
 	if cfg.JWTSecret == "" {
 		return &Config{}, errors.New("JWTSecret is required")

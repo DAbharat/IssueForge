@@ -15,6 +15,7 @@ type Querier interface {
 	AddMemberToProject(ctx context.Context, arg AddMemberToProjectParams) (ProjectMember, error)
 	AddWorkspaceMember(ctx context.Context, arg AddWorkspaceMemberParams) (WorkspaceMember, error)
 	AttachLabelsToIssue(ctx context.Context, arg AttachLabelsToIssueParams) error
+	BindGoogleSub(ctx context.Context, arg BindGoogleSubParams) (int64, error)
 	CancelInvitation(ctx context.Context, arg CancelInvitationParams) (CancelInvitationRow, error)
 	CountProjectLabels(ctx context.Context, arg CountProjectLabelsParams) (int64, error)
 	CreateActivity(ctx context.Context, arg CreateActivityParams) (IssueActivity, error)
@@ -22,6 +23,7 @@ type Querier interface {
 	CreateComment(ctx context.Context, arg CreateCommentParams) (Comment, error)
 	CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue, error)
 	CreateLabel(ctx context.Context, arg CreateLabelParams) (Label, error)
+	CreateOIDCUser(ctx context.Context, arg CreateOIDCUserParams) (CreateOIDCUserRow, error)
 	CreateOnboardingUser(ctx context.Context, arg CreateOnboardingUserParams) (CreateOnboardingUserRow, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
 	CreateWorkspace(ctx context.Context, name string) (CreateWorkspaceRow, error)
@@ -43,6 +45,7 @@ type Querier interface {
 	GetLabelProjectID(ctx context.Context, id int64) (int64, error)
 	GetProjectByID(ctx context.Context, id int64) (GetProjectByIDRow, error)
 	GetProjectByIDIncludingDeleted(ctx context.Context, id int64) (GetProjectByIDIncludingDeletedRow, error)
+	GetUserByGoogleSub(ctx context.Context, googleSub pgtype.Text) (GetUserByGoogleSubRow, error)
 	GetUserByID(ctx context.Context, id int64) (GetUserByIDRow, error)
 	GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error)
 	GetUserForLogin(ctx context.Context, email string) (GetUserForLoginRow, error)

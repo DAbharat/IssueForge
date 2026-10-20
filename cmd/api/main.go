@@ -1,6 +1,7 @@
 package main
 
 import (
+	"IssueForge/internal/auth"
 	postgres "IssueForge/internal/db"
 	"IssueForge/internal/db/config"
 	"IssueForge/internal/db/sqlc"
@@ -111,6 +112,11 @@ func main() {
 
 	refreshToken := refreshtoken.NewStore(redisClient, cfg.RefreshTokenTTL)
 
+	googleOIDC, err := auth.NewGoogleOauthConfig(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURL, context.Background())
+	if err != nil {
+		log.Fatalf("initialize google oidc: %v", err)
+	}
+
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewGoCollector())
 	reg.MustRegister(collectors.NewProcessCollector(
@@ -121,7 +127,7 @@ func main() {
 
 	userRepo := repository.NewUserRepository(queries)
 	workspaceMemberRepo := repository.NewWorkspaceMemberRepository(queries)
-	userService := service.NewUserService(userRepo, workspaceMemberRepo, cfg.JWTSecret, refreshToken)
+	userService := service.NewUserService(userRepo, workspaceMemberRepo, cfg.JWTSecret, refreshToken, googleOIDC)
 	userHandler := handler.NewUserHandler(userService)
 
 	authzRepo := repository.NewAuthorizationRepository(queries)

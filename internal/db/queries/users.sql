@@ -46,3 +46,26 @@ UPDATE users
 SET deleted_at = NOW()
 WHERE id = $1 AND deleted_at IS NULL
 RETURNING id;
+
+
+-- name: GetUserByGoogleSub :one
+SELECT id, email, username, fullname, password_hash
+FROM users
+WHERE google_sub = $1 AND deleted_at IS NULL
+LIMIT 1;
+
+
+-- name: CreateOIDCUser :one
+INSERT INTO users(
+  email, fullname, username, password_hash, google_sub
+) VALUES (
+  $1, $2, $3, $4, $5
+)
+RETURNING id, email, fullname, username, created_at;
+
+
+-- name: BindGoogleSub :one
+UPDATE users
+SET google_sub = $2
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id;

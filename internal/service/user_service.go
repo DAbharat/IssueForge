@@ -7,6 +7,8 @@ import (
 	"IssueForge/internal/redis/refreshtoken"
 	"IssueForge/internal/repository"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -21,6 +23,7 @@ import (
 
 const passwordHashCost = bcrypt.DefaultCost
 const dummyHash = "$2a$10$Az9g3YmX8.L7Z8gH4q2uOu9yVj6X7W4E8k3d1c9b8a7f6e5d4c3b2"
+const oidcPlaceholderHash = "!oidc-no-password!"
 
 type UserRepo interface {
 	CreateUser(ctx context.Context, email, displayName, fullname, passwordHash string) (sqlc.CreateOnboardingUserRow, error)
@@ -29,6 +32,9 @@ type UserRepo interface {
 	GetUserByUsername(ctx context.Context, username string) (sqlc.GetUserByUsernameRow, error)
 	SearchUserByUsername(ctx context.Context, search *string) ([]sqlc.SearchUserByUsernameRow, error)
 	DeleteUser(ctx context.Context, id int64) (int64, error)
+	GetUserByGoogleSub(ctx context.Context, sub *string) (sqlc.GetUserByGoogleSubRow, error)
+	CreateOIDCUser(ctx context.Context, email, fullname, username, passwordHash string, googleSub *string) (sqlc.CreateOIDCUserRow, error)
+	BindGoogleSub(ctx context.Context, id int64, sub *string) (int64, error)
 }
 
 type WorkspaceMemberRepo interface {
@@ -40,14 +46,16 @@ type UserService struct {
 	workspaceMemberRepo WorkspaceMemberRepo
 	jwtSecret           string
 	refreshToken        *refreshtoken.Store
+	googleOIDC          *auth.GoogleOIDC
 }
 
-func NewUserService(userRepo UserRepo, workspaceMemberRepo WorkspaceMemberRepo, jwtSecret string, refreshToken *refreshtoken.Store) *UserService {
+func NewUserService(userRepo UserRepo, workspaceMemberRepo WorkspaceMemberRepo, jwtSecret string, refreshToken *refreshtoken.Store, googleOIDC *auth.GoogleOIDC) *UserService {
 	return &UserService{
 		userRepo:            userRepo,
 		workspaceMemberRepo: workspaceMemberRepo,
 		jwtSecret:           jwtSecret,
 		refreshToken:        refreshToken,
+		googleOIDC:          googleOIDC,
 	}
 }
 
@@ -338,4 +346,208 @@ func (s *UserService) DeleteUser(ctx context.Context, id int64) (int64, error) {
 		return 0, fmt.Errorf("delete user: %w", err)
 	}
 	return userID, nil
+}
+
+func (s *UserService) GoogleAuthURL(state string) (string, error) {
+	if s.googleOIDC == nil || s.googleOIDC.Config == nil {
+		return "", errors.New("google oauth is not configured")
+	}
+	if len(state) < 32 {
+		return "", errors.New("invalid oauth state")
+	}
+
+	return s.googleOIDC.Config.AuthCodeURL(state), nil
+}
+
+func (s *UserService) GoogleLogin(ctx context.Context, code string) (dto.LoginUserResponse, error) {
+	if s.googleOIDC == nil || s.googleOIDC.Config == nil || s.googleOIDC.Verifier == nil {
+		return dto.LoginUserResponse{}, errors.New("google oidc is not configured")
+	}
+	if strings.TrimSpace(code) == "" {
+		return dto.LoginUserResponse{}, ErrInvalidCredentials
+	}
+
+	oauthToken, err := s.googleOIDC.Config.Exchange(ctx, code)
+	if err != nil {
+		return dto.LoginUserResponse{}, fmt.Errorf("exchange google authorization code: %w", err)
+	}
+
+	rawIDToken, ok := oauthToken.Extra("id_token").(string)
+	if !ok || rawIDToken == "" {
+		return dto.LoginUserResponse{}, errors.New("google response did not contain an id token")
+	}
+
+	idToken, err := s.googleOIDC.Verifier.Verify(ctx, rawIDToken)
+	if err != nil {
+		return dto.LoginUserResponse{}, fmt.Errorf("verify google id token: %w", err)
+	}
+
+	var claims dto.GoogleUserInfo
+	if err := idToken.Claims(&claims); err != nil {
+		return dto.LoginUserResponse{}, fmt.Errorf("decode google id token claims: %w", err)
+	}
+
+	claims.Sub = strings.TrimSpace(claims.Sub)
+	claims.Email = strings.TrimSpace(claims.Email)
+
+	if claims.Sub == "" || claims.Email == "" || !claims.EmailVerified {
+		return dto.LoginUserResponse{}, ErrInvalidCredentials
+	}
+
+	type googleLoginUser struct {
+		ID       int64
+		Username string
+		Fullname string
+		Email    string
+	}
+
+	dbUser, err := s.userRepo.GetUserByGoogleSub(ctx, &claims.Sub)
+
+	var user googleLoginUser
+
+	if err == nil {
+		user = googleLoginUser{
+			ID:       dbUser.ID,
+			Username: dbUser.Username,
+			Fullname: dbUser.Fullname,
+			Email:    dbUser.Email,
+		}
+	} else {
+		if !errors.Is(err, repository.ErrUserNotFound) {
+			return dto.LoginUserResponse{}, fmt.Errorf("find google user: %w", err)
+		}
+
+		existingUser, lookupErr := s.userRepo.GetUserForLogin(ctx, claims.Email)
+		switch {
+		case lookupErr == nil:
+			if _, bindErr := s.userRepo.BindGoogleSub(ctx, existingUser.ID, &claims.Sub); bindErr != nil {
+				if errors.Is(bindErr, repository.ErrDuplicateGoogleSub) {
+					return dto.LoginUserResponse{}, ErrDuplicateGoogleSub
+				}
+				return dto.LoginUserResponse{}, fmt.Errorf("bind google sub: %w", bindErr)
+			}
+
+			user = googleLoginUser{
+				ID:       existingUser.ID,
+				Username: existingUser.Username,
+				Fullname: existingUser.Fullname,
+				Email:    existingUser.Email,
+			}
+
+		case errors.Is(lookupErr, repository.ErrUserNotFound):
+			fullname := strings.TrimSpace(claims.Name)
+			if fullname == "" {
+				fullname = strings.TrimSpace(claims.GivenName + " " + claims.FamilyName)
+			}
+
+			created := false
+			for attempt := 0; attempt < 5; attempt++ {
+				username, genErr := s.generateGoogleUsername(ctx, claims.Email)
+				if genErr != nil {
+					return dto.LoginUserResponse{}, fmt.Errorf("generate google username: %w", genErr)
+				}
+				if utf8.RuneCountInString(fullname) < 3 {
+					fullname = username
+				}
+
+				createdUser, createErr := s.userRepo.CreateOIDCUser(ctx, claims.Email, fullname, username, oidcPlaceholderHash, &claims.Sub)
+				if createErr == nil {
+					user = googleLoginUser{
+						ID:       createdUser.ID,
+						Username: createdUser.Username,
+						Fullname: createdUser.Fullname,
+						Email:    createdUser.Email,
+					}
+					created = true
+					break
+				}
+				if errors.Is(createErr, repository.ErrDuplicateUsername) {
+					continue
+				}
+				if errors.Is(createErr, repository.ErrDuplicateEmail) {
+					return dto.LoginUserResponse{}, ErrDuplicateEmail
+				}
+				if errors.Is(createErr, repository.ErrDuplicateGoogleSub) {
+					return dto.LoginUserResponse{}, ErrDuplicateGoogleSub
+				}
+				return dto.LoginUserResponse{}, fmt.Errorf("create google user: %w", createErr)
+			}
+			if !created {
+				return dto.LoginUserResponse{}, ErrDuplicateUsername
+			}
+
+		default:
+			return dto.LoginUserResponse{}, fmt.Errorf("check existing email: %w", lookupErr)
+		}
+	}
+
+	workspaces, err := s.workspaceMemberRepo.ListUserWorkspaces(ctx, user.ID, "")
+	if err != nil {
+		return dto.LoginUserResponse{}, fmt.Errorf("get login workspaces: %w", err)
+	}
+
+	accessToken, err := auth.GenerateToken(user.ID, s.jwtSecret)
+	if err != nil {
+		return dto.LoginUserResponse{}, fmt.Errorf("generate access token: %w", err)
+	}
+
+	refreshToken, err := auth.GenerateRefToken()
+	if err != nil {
+		return dto.LoginUserResponse{}, fmt.Errorf("generate refresh token: %w", err)
+	}
+
+	if err := s.refreshToken.CreateRefreshToken(ctx, refreshToken, user.ID); err != nil {
+		return dto.LoginUserResponse{}, fmt.Errorf("store refresh token: %w", err)
+	}
+
+	return dto.LoginUserResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		User: dto.MeResponse{
+			ID:         user.ID,
+			Username:   user.Username,
+			Email:      user.Email,
+			Fullname:   user.Fullname,
+			Workspaces: s.mapWorkspaces(workspaces),
+		},
+	}, nil
+}
+
+func (s *UserService) generateGoogleUsername(ctx context.Context, email string) (string, error) {
+	localPart := strings.SplitN(email, "@", 2)[0]
+	localPart = strings.ToLower(localPart)
+
+	var builder strings.Builder
+	for _, r := range localPart {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '.' {
+			builder.WriteRune(r)
+		}
+	}
+
+	base := strings.Trim(builder.String(), "._")
+	if len(base) < 3 {
+		base = "googleuser"
+	}
+	if len(base) > 20 {
+		base = base[:20]
+	}
+
+	for attempt := 0; attempt < 5; attempt++ {
+		randomBytes := make([]byte, 4)
+		if _, err := rand.Read(randomBytes); err != nil {
+			return "", err
+		}
+		suffix := hex.EncodeToString(randomBytes)
+		username := base + "_" + strings.ToLower(suffix[:5])
+
+		_, err := s.userRepo.GetUserByUsername(ctx, username)
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return username, nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return "", errors.New("could not generate a unique username")
 }
