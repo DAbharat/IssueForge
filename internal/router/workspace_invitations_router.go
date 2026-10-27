@@ -15,15 +15,15 @@ func registerWorkspaceInvitationsRoutes(r *mux.Router, workspaceInvitationsHandl
 		),
 	).Methods("POST")
 
-	r.Handle("/api/invitations/{invitationID}",
-		authMiddleware.Authenticate(
-			readRateLimit.Limit(http.HandlerFunc(workspaceInvitationsHandler.GetWorkspaceInvitation)),
-		),
-	).Methods("GET")
-
 	r.Handle("/api/invitations/pending",
 		authMiddleware.Authenticate(
 			readRateLimit.Limit(http.HandlerFunc(workspaceInvitationsHandler.ListPendingWorkspaceInvitations)),
+		),
+	).Methods("GET")
+
+	r.Handle("/api/invitations/{invitationID:[0-9]+}",
+		authMiddleware.Authenticate(
+			readRateLimit.Limit(http.HandlerFunc(workspaceInvitationsHandler.GetWorkspaceInvitation)),
 		),
 	).Methods("GET")
 

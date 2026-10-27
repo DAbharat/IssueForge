@@ -11,10 +11,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 )
@@ -30,6 +34,7 @@ type UserService interface {
 	DeleteUser(ctx context.Context, id int64) (int64, error)
 	GoogleAuthURL(state string) (string, error)
 	GoogleLogin(ctx context.Context, code string) (dto.LoginUserResponse, error)
+	Logout(ctx context.Context, token string) error
 }
 
 type UserHandler struct {
@@ -289,13 +294,15 @@ func (h *UserHandler) GoogleLoginStart(w http.ResponseWriter, r *http.Request) {
 
 	state := base64.RawURLEncoding.EncodeToString(stateBytes)
 
+	isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "google_oauth_state",
 		Value:    state,
-		Path:     "/api/auth/google",
+		Path:     "/",
 		MaxAge:   300,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
 
@@ -310,26 +317,29 @@ func (h *UserHandler) GoogleLoginStart(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) GoogleLoginCallback(w http.ResponseWriter, r *http.Request) {
-	stateCookie, err := r.Cookie("google_oauth_state")
-	if err != nil || stateCookie.Value == "" {
-		httpx.RespondWithError(w, http.StatusBadRequest, "invalid oauth state")
-		return
-	}
+	isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 
-	defer http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{
 		Name:     "google_oauth_state",
 		Value:    "",
-		Path:     "/api/auth/google",
+		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
 
+	stateCookie, err := r.Cookie("google_oauth_state")
 	state := r.URL.Query().Get("state")
-	if state == "" || state != stateCookie.Value {
+
+	if err != nil || stateCookie.Value == "" {
+		log.Printf("GoogleLoginCallback: state mismatch or missing cookie: err=%v, stateParam=%s", err, state)
 		httpx.RespondWithError(w, http.StatusBadRequest, "invalid oauth state")
 		return
+	}
+	if state == "" || state != stateCookie.Value {
+		log.Printf("GoogleLoginCallback: state mismatch or missing cookie: err=%v, stateParam=%s", err, state)
+		httpx.RespondWithError(w, http.StatusBadRequest, "invalid oauth state")
 	}
 
 	if providerErr := r.URL.Query().Get("error"); providerErr != "" {
@@ -358,5 +368,50 @@ func (h *UserHandler) GoogleLoginCallback(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if r.Header.Get("Sec-Fetch-Mode") == "navigate" {
+		frontendURL := os.Getenv("FRONTEND_URL")
+		if frontendURL == "" {
+			frontendURL = "http://localhost:4000"
+		}
+		redirectTarget := fmt.Sprintf("%s/auth/callback?access_token=%s&refresh_token=%s",
+			strings.TrimRight(frontendURL, "/"),
+			url.QueryEscape(result.AccessToken),
+			url.QueryEscape(result.RefreshToken),
+		)
+		http.Redirect(w, r, redirectTarget, http.StatusFound)
+		return
+	}
+
 	httpx.RespondWithJSON(w, http.StatusOK, result)
+}
+
+func (h *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	_, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+
+	var req dto.LogoutRequest
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, "invalid or oversized request body")
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		httpx.RespondWithError(w, http.StatusBadRequest, "request body must contain a single json object")
+		return
+	}
+
+	if err := h.userService.Logout(r.Context(), req.RefreshToken); err != nil {
+		log.Printf("logout fail: %v", err)
+	}
+
+	httpx.RespondWithJSON(w, http.StatusOK, map[string]string{
+		"message": "user logged out",
+	})
 }

@@ -62,3 +62,7 @@ type GoogleUserInfo struct {
 	GivenName     string `json:"given_name"`
 	FamilyName    string `json:"family_name"`
 }
+
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}

@@ -61,4 +61,10 @@ func registerUserRoutes(r *mux.Router, userHandler *handler.UserHandler, authMid
 	r.Handle("/api/auth/google/callback",
 		http.HandlerFunc(userHandler.GoogleLoginCallback),
 	).Methods("GET")
+
+	r.Handle("/api/users/logout",
+		authMiddleware.Authenticate(
+			authRateLimit.Limit(http.HandlerFunc(userHandler.Logout)),
+		),
+	).Methods("POST")
 }

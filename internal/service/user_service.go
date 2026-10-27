@@ -551,3 +551,16 @@ func (s *UserService) generateGoogleUsername(ctx context.Context, email string) 
 
 	return "", errors.New("could not generate a unique username")
 }
+
+func (s *UserService) Logout(ctx context.Context, token string) error {
+	if token == "" {
+		return nil
+	}
+
+	err := s.refreshToken.DeleteRefreshToken(ctx, token)
+	if err != nil && !errors.Is(err, refreshtoken.ErrTokenNotFound) {
+		return fmt.Errorf("delete refresh token: %w", err)
+	}
+
+	return nil
+}
