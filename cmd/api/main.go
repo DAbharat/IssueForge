@@ -9,6 +9,7 @@ import (
 	"IssueForge/internal/middleware"
 	"IssueForge/internal/redis"
 	"IssueForge/internal/redis/cache"
+	"IssueForge/internal/redis/handoff"
 	"IssueForge/internal/redis/queue"
 	"IssueForge/internal/redis/ratelimit"
 	"IssueForge/internal/redis/refreshtoken"
@@ -125,9 +126,11 @@ func main() {
 
 	queries := sqlc.New(pool)
 
+	handoffStore := handoff.NewStore(redisClient)
+
 	userRepo := repository.NewUserRepository(queries)
 	workspaceMemberRepo := repository.NewWorkspaceMemberRepository(queries)
-	userService := service.NewUserService(userRepo, workspaceMemberRepo, cfg.JWTSecret, refreshToken, googleOIDC)
+	userService := service.NewUserService(userRepo, workspaceMemberRepo, cfg.JWTSecret, refreshToken, googleOIDC, handoffStore)
 	userHandler := handler.NewUserHandler(userService)
 
 	authzRepo := repository.NewAuthorizationRepository(queries)

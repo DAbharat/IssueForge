@@ -67,4 +67,8 @@ func registerUserRoutes(r *mux.Router, userHandler *handler.UserHandler, authMid
 			authRateLimit.Limit(http.HandlerFunc(userHandler.Logout)),
 		),
 	).Methods("POST")
+
+	r.Handle("/api/auth/exchange",
+		http.HandlerFunc(userHandler.ExchangeHandoff),
+	).Methods("POST")
 }

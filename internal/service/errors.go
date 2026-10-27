@@ -67,4 +67,5 @@ var (
 	ErrParentWorkspaceDeleted        = errors.New("cannot restore: parent workspace is archived. Please restore the workspace first.")
 	ErrParentProjectDeleted          = errors.New("cannot restore: parent project is archived. Please restore the project first.")
 	ErrDuplicateGoogleSub            = errors.New("this google account is already linked to another user")
+	ErrInvalidHandoffCode            = errors.New("invalid or expired handoff code")
 )

@@ -66,3 +66,12 @@ type GoogleUserInfo struct {
 type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
+
+type ExchangeRequest struct {
+	Code string `json:"code"`
+}
+
+type ExchangeResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}

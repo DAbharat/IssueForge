@@ -35,6 +35,8 @@ type UserService interface {
 	GoogleAuthURL(state string) (string, error)
 	GoogleLogin(ctx context.Context, code string) (dto.LoginUserResponse, error)
 	Logout(ctx context.Context, token string) error
+	CreateHandoff(ctx context.Context, accessToken, refreshToken string) (string, error)
+	ExchangeHandoff(ctx context.Context, code string) (dto.ExchangeResponse, error)
 }
 
 type UserHandler struct {
@@ -369,20 +371,57 @@ func (h *UserHandler) GoogleLoginCallback(w http.ResponseWriter, r *http.Request
 	}
 
 	if r.Header.Get("Sec-Fetch-Mode") == "navigate" {
+		handoffCode, err := h.userService.CreateHandoff(r.Context(), result.AccessToken, result.RefreshToken)
+		if err != nil {
+			log.Printf("create handoff: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
 		frontendURL := os.Getenv("FRONTEND_URL")
 		if frontendURL == "" {
 			frontendURL = "http://localhost:4000"
 		}
-		redirectTarget := fmt.Sprintf("%s/auth/callback?access_token=%s&refresh_token=%s",
+		redirectTarget := fmt.Sprintf("%s/auth/callback?code=%s",
 			strings.TrimRight(frontendURL, "/"),
-			url.QueryEscape(result.AccessToken),
-			url.QueryEscape(result.RefreshToken),
+			url.QueryEscape(handoffCode),
 		)
 		http.Redirect(w, r, redirectTarget, http.StatusFound)
 		return
 	}
 
 	httpx.RespondWithJSON(w, http.StatusOK, result)
+}
+
+func (h *UserHandler) ExchangeHandoff(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+
+	var req dto.ExchangeRequest
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, "invalid or oversized request body")
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		httpx.RespondWithError(w, http.StatusBadRequest, "request body must only contain a single json object")
+		return
+	}
+
+	response, err := h.userService.ExchangeHandoff(r.Context(), req.Code)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidHandoffCode):
+			httpx.RespondWithError(w, http.StatusBadRequest, err.Error())
+		default:
+			log.Printf("exchange handoff: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+	}
+
+	httpx.RespondWithJSON(w, http.StatusOK, response)
 }
 
 func (h *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {

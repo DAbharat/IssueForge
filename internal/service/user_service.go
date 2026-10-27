@@ -4,10 +4,12 @@ import (
 	"IssueForge/internal/auth"
 	"IssueForge/internal/db/sqlc"
 	"IssueForge/internal/dto"
+	"IssueForge/internal/redis/handoff"
 	"IssueForge/internal/redis/refreshtoken"
 	"IssueForge/internal/repository"
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -15,6 +17,7 @@ import (
 	"net/mail"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -37,6 +40,11 @@ type UserRepo interface {
 	BindGoogleSub(ctx context.Context, id int64, sub *string) (int64, error)
 }
 
+type HandoffStore interface {
+	Save(ctx context.Context, code string, t handoff.Tokens, ttl time.Duration) error
+	Consume(ctx context.Context, code string) (handoff.Tokens, error)
+}
+
 type WorkspaceMemberRepo interface {
 	ListUserWorkspaces(ctx context.Context, userID int64, search string) ([]sqlc.ListUserWorkspacesRow, error)
 }
@@ -47,17 +55,21 @@ type UserService struct {
 	jwtSecret           string
 	refreshToken        *refreshtoken.Store
 	googleOIDC          *auth.GoogleOIDC
+	handoffStore        HandoffStore
 }
 
-func NewUserService(userRepo UserRepo, workspaceMemberRepo WorkspaceMemberRepo, jwtSecret string, refreshToken *refreshtoken.Store, googleOIDC *auth.GoogleOIDC) *UserService {
+func NewUserService(userRepo UserRepo, workspaceMemberRepo WorkspaceMemberRepo, jwtSecret string, refreshToken *refreshtoken.Store, googleOIDC *auth.GoogleOIDC, handoffStore HandoffStore) *UserService {
 	return &UserService{
 		userRepo:            userRepo,
 		workspaceMemberRepo: workspaceMemberRepo,
 		jwtSecret:           jwtSecret,
 		refreshToken:        refreshToken,
 		googleOIDC:          googleOIDC,
+		handoffStore:        handoffStore,
 	}
 }
+
+const handoffCodeTTL = 30 * time.Second
 
 func isValidUsername(username string) bool {
 	pattern := `^[a-z0-9_.]+$`
@@ -563,4 +575,48 @@ func (s *UserService) Logout(ctx context.Context, token string) error {
 	}
 
 	return nil
+}
+
+func (s *UserService) CreateHandoff(ctx context.Context, accessToken, refreshToken string) (string, error) {
+	code, err := generateHandoffCode()
+	if err != nil {
+		return "", fmt.Errorf("generate handoff code: %w", err)
+	}
+
+	err = s.handoffStore.Save(ctx, code, handoff.Tokens{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, handoffCodeTTL)
+	if err != nil {
+		return "", fmt.Errorf("save handoff: %w", err)
+	}
+
+	return code, nil
+}
+
+func (s *UserService) ExchangeHandoff(ctx context.Context, code string) (dto.ExchangeResponse, error) {
+	if code == "" {
+		return dto.ExchangeResponse{}, ErrInvalidHandoffCode
+	}
+
+	tokens, err := s.handoffStore.Consume(ctx, code)
+	if err != nil {
+		if errors.Is(err, handoff.ErrCodeNotFound) {
+			return dto.ExchangeResponse{}, ErrInvalidHandoffCode
+		}
+		return dto.ExchangeResponse{}, fmt.Errorf("consume handoff: %w", err)
+	}
+
+	return dto.ExchangeResponse{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+	}, nil
+}
+
+func generateHandoffCode() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
