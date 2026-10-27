@@ -91,6 +91,9 @@ func (s *ProjectService) GetProjectByID(ctx context.Context, requesterID, projec
 	}
 	if found {
 		log.Println("CACHE HIT")
+		if err := s.authz.RequireProjectMember(ctx, cachedProject.ID, requesterID); err != nil {
+			return dto.ProjectResponse{}, err
+		}
 		return cachedProject, nil
 	}
 	log.Println("CACHE MISS")

@@ -21,6 +21,7 @@ type IssueAttachmentsService interface {
 	ListCommentAttachments(ctx context.Context, requesterID, commentID int64) ([]dto.AttachmentResponse, error)
 	ListIssueAttachments(ctx context.Context, requesterID, issueID int64) ([]dto.AttachmentResponse, error)
 	SoftDeleteAttachments(ctx context.Context, requesterID, id int64) (int64, error)
+	RestoreAttachment(ctx context.Context, requesterID, id int64) (int64, error)
 }
 
 type IssueAttachmentsHandler struct {
@@ -233,3 +234,39 @@ func (h *IssueAttachmentsHandler) SoftDeleteAttachments(w http.ResponseWriter, r
 		"attachmentID": attachment,
 	})
 }
+
+func (h *IssueAttachmentsHandler) RestoreAttachment(w http.ResponseWriter, r *http.Request) {
+	requesterID, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	vars := mux.Vars(r)
+
+	attachmentID, err := strconv.ParseInt(vars["attachmentID"], 10, 64)
+	if err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidAttachmentID.Error())
+		return
+	}
+
+	attachment, err := h.issueAttachmentsService.RestoreAttachment(r.Context(), requesterID, attachmentID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
+		case errors.Is(err, service.ErrAttachmentNotFound):
+			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
+		case errors.Is(err, service.ErrIssueNotFound):
+			httpx.RespondWithError(w, http.StatusNotFound, err.Error())
+		default:
+			log.Printf("restore attachment failed: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+	httpx.RespondWithJSON(w, http.StatusOK, map[string]int64{
+		"attachmentID": attachment,
+	})
+}
+

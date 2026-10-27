@@ -22,6 +22,8 @@ type IssueAttachmentRepo interface {
 	ListCommentAttachments(ctx context.Context, commentID int64) ([]sqlc.ListCommentAttachmentsRow, error)
 	ListIssueAttachments(ctx context.Context, issueID int64) ([]sqlc.ListIssueAttachmentsRow, error)
 	SoftDeleteAttachments(ctx context.Context, id int64) (sqlc.SoftDeleteAttachmentRow, error)
+	GetAttachmentByIDIncludingDeleted(ctx context.Context, id int64) (sqlc.GetAttachmentByIDIncludingDeletedRow, error)
+	RestoreDeletedAttachment(ctx context.Context, id int64) (sqlc.RestoreDeletedAttachmentRow, error)
 }
 
 type IssueAttachmentService struct {
@@ -356,3 +358,43 @@ func (s *IssueAttachmentService) SoftDeleteAttachments(ctx context.Context, requ
 
 	return attachment.ID, nil
 }
+
+func (s *IssueAttachmentService) RestoreAttachment(ctx context.Context, requesterID, id int64) (int64, error) {
+	dbAttachment, err := s.repo.GetAttachmentByIDIncludingDeleted(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrAttachmentNotFound) {
+			return 0, ErrAttachmentNotFound
+		}
+		return 0, fmt.Errorf("get attachment by id including deleted: %w", err)
+	}
+
+	projectID, err := s.issueLookupRepo.GetIssueProjectID(ctx, dbAttachment.IssueID)
+	if err != nil {
+		if errors.Is(err, repository.ErrIssueNotFound) {
+			return 0, ErrIssueNotFound
+		}
+		return 0, fmt.Errorf("get issue project id: %w", err)
+	}
+
+	isUploader := dbAttachment.UploadedBy == requesterID
+	isLead := s.authz.RequireProjectLead(ctx, projectID, requesterID) == nil
+
+	if !isUploader && !isLead {
+		return 0, ErrForbidden
+	}
+
+	if err := s.authz.RequireProjectMember(ctx, projectID, requesterID); err != nil {
+		return 0, err
+	}
+
+	attachment, err := s.repo.RestoreDeletedAttachment(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrAttachmentNotFound) {
+			return 0, ErrAttachmentNotFound
+		}
+		return 0, fmt.Errorf("restore attachment: %w", err)
+	}
+
+	return attachment.ID, nil
+}
+

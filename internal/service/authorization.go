@@ -93,6 +93,10 @@ func (a *AuthorizationService) RequireProjectMember(ctx context.Context, project
 	}
 
 	if !ok {
+		isLead, leadErr := a.repo.IsProjectLead(ctx, projectID, userID)
+		if leadErr == nil && isLead {
+			return nil
+		}
 		return auth.ErrForbidden
 	}
 

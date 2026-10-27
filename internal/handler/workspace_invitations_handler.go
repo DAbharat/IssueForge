@@ -21,6 +21,7 @@ type WorkspaceInvitationsService interface {
 	GetWorkspaceInvitation(ctx context.Context, requesterID, invitationID int64) (dto.WorkspaceInvitationResponse, error)
 	ListPendingWorkspaceInvitations(ctx context.Context, requesterID int64) ([]dto.PendingWorkspaceInvitationResponse, error)
 	ListPendingWorkspaceInvitationsForWorkspace(ctx context.Context, requesterID, workspaceID int64) ([]dto.WorkspacePendingInvitationResponse, error)
+	ListRejectedWorkspaceInvitationsForWorkspace(ctx context.Context, requesterID, workspaceID int64) ([]dto.WorkspaceRejectedInvitationResponse, error)
 	AcceptInvitation(ctx context.Context, invitationID, requesterID int64) (dto.WorkspaceInvitationResponse, error)
 	DeclineInvitation(ctx context.Context, invitationID, requesterID int64) (dto.WorkspaceInvitationResponse, error)
 	CancelInvitation(ctx context.Context, invitationID, requesterID int64) (dto.WorkspaceInvitationResponse, error)
@@ -162,6 +163,36 @@ func (h *WorkspaceInvitationHandler) ListPendingWorkspaceInvitationsForWorkspace
 	}
 	httpx.RespondWithJSON(w, http.StatusOK, invitations)
 }
+
+func (h *WorkspaceInvitationHandler) ListRejectedWorkspaceInvitationsForWorkspace(w http.ResponseWriter, r *http.Request) {
+	requesterID, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		httpx.RespondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	vars := mux.Vars(r)
+
+	workspaceID, err := strconv.ParseInt(vars["workspaceID"], 10, 64)
+	if err != nil {
+		httpx.RespondWithError(w, http.StatusBadRequest, service.ErrInvalidWorkspaceID.Error())
+		return
+	}
+
+	invitations, err := h.workspaceInvitationService.ListRejectedWorkspaceInvitationsForWorkspace(r.Context(), requesterID, workspaceID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			httpx.RespondWithError(w, http.StatusForbidden, err.Error())
+		default:
+			log.Printf("list rejected workspace invitations for workspace: %v", err)
+			httpx.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+	httpx.RespondWithJSON(w, http.StatusOK, invitations)
+}
+
 
 func (h *WorkspaceInvitationHandler) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
 	requesterID, ok := middleware.GetUserFromContext(r.Context())

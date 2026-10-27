@@ -35,6 +35,17 @@ WHERE wi.workspace_id = $1 AND wi.status = 'PENDING' AND w.deleted_at IS NULL
 ORDER BY wi.created_at DESC;
 
 
+-- name: ListRejectedWorkspaceInvitationsForWorkspace :many
+SELECT wi.id, wi.workspace_id, wi.invited_user_id, wi.invited_by, wi.status, wi.created_at, wi.responded_at,
+    u.username AS invited_username, u.fullname AS invited_fullname
+FROM workspace_invitations wi
+JOIN users u ON wi.invited_user_id = u.id
+JOIN workspaces w ON wi.workspace_id = w.id
+WHERE wi.workspace_id = $1 AND wi.status IN ('DECLINED', 'CANCELLED') AND w.deleted_at IS NULL
+ORDER BY wi.responded_at DESC, wi.created_at DESC;
+
+
+
 -- name: AcceptInvitation :one
 UPDATE workspace_invitations
 SET status = 'ACCEPTED', responded_at = NOW()

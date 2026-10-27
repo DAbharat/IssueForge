@@ -33,6 +33,13 @@ func registerWorkspaceInvitationsRoutes(r *mux.Router, workspaceInvitationsHandl
 		),
 	).Methods("GET")
 
+	r.Handle("/api/workspaces/{workspaceID}/invitations/rejected",
+		authMiddleware.Authenticate(
+			readRateLimit.Limit(http.HandlerFunc(workspaceInvitationsHandler.ListRejectedWorkspaceInvitationsForWorkspace)),
+		),
+	).Methods("GET")
+
+
 	r.Handle("/api/invitations/{invitationID}/accept",
 		authMiddleware.Authenticate(
 			createRateLimit.Limit(http.HandlerFunc(workspaceInvitationsHandler.AcceptInvitation)),

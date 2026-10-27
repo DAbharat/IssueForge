@@ -17,6 +17,7 @@ type WorkspaceInvitationsRepository interface {
 	GetWorkspaceInvitation(ctx context.Context, id int64) (sqlc.WorkspaceInvitation, error)
 	ListPendingWorkspaceInvitations(ctx context.Context, invitedUserID int64) ([]sqlc.ListPendingWorkspaceInvitationsRow, error)
 	ListPendingWorkspaceInvitationsForWorkspace(ctx context.Context, workspaceID int64) ([]sqlc.ListPendingWorkspaceInvitationsForWorkspaceRow, error)
+	ListRejectedWorkspaceInvitationsForWorkspace(ctx context.Context, workspaceID int64) ([]sqlc.ListRejectedWorkspaceInvitationsForWorkspaceRow, error)
 	AcceptInvitation(ctx context.Context, id, invitedUserID int64) (sqlc.AcceptInvitationRow, error)
 	DeclineInvitation(ctx context.Context, id, invitedUserID int64) (sqlc.DeclineInvitationRow, error)
 	CancelInvitation(ctx context.Context, id, invitedBy int64) (sqlc.CancelInvitationRow, error)
@@ -188,6 +189,41 @@ func (s *WorkspaceInvitationService) ListPendingWorkspaceInvitationsForWorkspace
 
 	return invitations, nil
 }
+
+func (s *WorkspaceInvitationService) ListRejectedWorkspaceInvitationsForWorkspace(ctx context.Context, requesterID, workspaceID int64) ([]dto.WorkspaceRejectedInvitationResponse, error) {
+	if workspaceID <= 0 {
+		return nil, ErrInvalidWorkspaceID
+	}
+	if err := s.authz.RequireWorkspaceAdmin(ctx, workspaceID, requesterID); err != nil {
+		return nil, err
+	}
+
+	dbInvitations, err := s.workspaceInvitationRepo.ListRejectedWorkspaceInvitationsForWorkspace(ctx, workspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("list rejected workspace invitations for workspace: %w", err)
+	}
+
+	invitations := make([]dto.WorkspaceRejectedInvitationResponse, 0, len(dbInvitations))
+	for _, i := range dbInvitations {
+		var respondTime *time.Time
+		if i.RespondedAt.Valid {
+			respondTime = &i.RespondedAt.Time
+		}
+		invitations = append(invitations, dto.WorkspaceRejectedInvitationResponse{
+			ID:            i.ID,
+			WorkspaceID:   i.WorkspaceID,
+			InvitedUserID: i.InvitedUserID,
+			Username:      i.InvitedUsername,
+			Fullname:      i.InvitedFullname,
+			Status:        i.Status,
+			CreatedAt:     i.CreatedAt.Time,
+			RespondedAt:   respondTime,
+		})
+	}
+
+	return invitations, nil
+}
+
 
 func (s *WorkspaceInvitationService) AcceptInvitation(ctx context.Context, invitationID, requesterID int64) (dto.WorkspaceInvitationResponse, error) {
 	if invitationID <= 0 {

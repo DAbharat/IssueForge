@@ -46,3 +46,18 @@ UPDATE issue_attachments
 SET deleted_at = NOW()
 WHERE id = $1 AND deleted_at IS NULL
 RETURNING id, storage_key, resource_type;
+
+
+-- name: GetAttachmentByIDIncludingDeleted :one
+SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.public_url, ia.created_at, ia.deleted_at,
+    uploader.fullname AS uploader_name, uploader.username AS uploader_username
+FROM issue_attachments ia
+JOIN users uploader ON ia.uploaded_by = uploader.id
+WHERE ia.id = $1;
+
+
+-- name: RestoreDeletedAttachment :one
+UPDATE issue_attachments
+SET deleted_at = NULL
+WHERE id = $1 AND deleted_at IS NOT NULL
+RETURNING id, issue_id, comment_id, uploaded_by, original_name, storage_key, resource_type, mime_type, file_size, public_url, created_at, deleted_at;

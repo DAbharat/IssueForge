@@ -256,3 +256,55 @@ func (q *Queries) ListPendingWorkspaceInvitationsForWorkspace(ctx context.Contex
 	}
 	return items, nil
 }
+
+const listRejectedWorkspaceInvitationsForWorkspace = `-- name: ListRejectedWorkspaceInvitationsForWorkspace :many
+SELECT wi.id, wi.workspace_id, wi.invited_user_id, wi.invited_by, wi.status, wi.created_at, wi.responded_at,
+    u.username AS invited_username, u.fullname AS invited_fullname
+FROM workspace_invitations wi
+JOIN users u ON wi.invited_user_id = u.id
+JOIN workspaces w ON wi.workspace_id = w.id
+WHERE wi.workspace_id = $1 AND wi.status IN ('DECLINED', 'CANCELLED') AND w.deleted_at IS NULL
+ORDER BY wi.responded_at DESC, wi.created_at DESC
+`
+
+type ListRejectedWorkspaceInvitationsForWorkspaceRow struct {
+	ID              int64              `json:"id"`
+	WorkspaceID     int64              `json:"workspace_id"`
+	InvitedUserID   int64              `json:"invited_user_id"`
+	InvitedBy       int64              `json:"invited_by"`
+	Status          string             `json:"status"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	RespondedAt     pgtype.Timestamptz `json:"responded_at"`
+	InvitedUsername string             `json:"invited_username"`
+	InvitedFullname string             `json:"invited_fullname"`
+}
+
+func (q *Queries) ListRejectedWorkspaceInvitationsForWorkspace(ctx context.Context, workspaceID int64) ([]ListRejectedWorkspaceInvitationsForWorkspaceRow, error) {
+	rows, err := q.db.Query(ctx, listRejectedWorkspaceInvitationsForWorkspace, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRejectedWorkspaceInvitationsForWorkspaceRow
+	for rows.Next() {
+		var i ListRejectedWorkspaceInvitationsForWorkspaceRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.InvitedUserID,
+			&i.InvitedBy,
+			&i.Status,
+			&i.CreatedAt,
+			&i.RespondedAt,
+			&i.InvitedUsername,
+			&i.InvitedFullname,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

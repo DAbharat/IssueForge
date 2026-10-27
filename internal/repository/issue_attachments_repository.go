@@ -103,3 +103,26 @@ func (r *IssueAttachmentsRepository) SoftDeleteAttachments(ctx context.Context, 
 	}
 	return attachment, nil
 }
+
+func (r *IssueAttachmentsRepository) GetAttachmentByIDIncludingDeleted(ctx context.Context, id int64) (sqlc.GetAttachmentByIDIncludingDeletedRow, error) {
+	attachment, err := r.queries.GetAttachmentByIDIncludingDeleted(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.GetAttachmentByIDIncludingDeletedRow{}, ErrAttachmentNotFound
+		}
+		return sqlc.GetAttachmentByIDIncludingDeletedRow{}, fmt.Errorf("get attachment by id including deleted: %w", err)
+	}
+	return attachment, nil
+}
+
+func (r *IssueAttachmentsRepository) RestoreDeletedAttachment(ctx context.Context, id int64) (sqlc.RestoreDeletedAttachmentRow, error) {
+	attachment, err := r.queries.RestoreDeletedAttachment(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.RestoreDeletedAttachmentRow{}, ErrAttachmentNotFound
+		}
+		return sqlc.RestoreDeletedAttachmentRow{}, fmt.Errorf("restore deleted attachment: %w", err)
+	}
+	return attachment, nil
+}
+

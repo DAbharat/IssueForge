@@ -70,6 +70,15 @@ func (r *WorkspaceInvitationsRepository) ListPendingWorkspaceInvitationsForWorks
 	return invitations, nil
 }
 
+func (r *WorkspaceInvitationsRepository) ListRejectedWorkspaceInvitationsForWorkspace(ctx context.Context, workspaceID int64) ([]sqlc.ListRejectedWorkspaceInvitationsForWorkspaceRow, error) {
+	invitations, err := r.queries.ListRejectedWorkspaceInvitationsForWorkspace(ctx, workspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("list rejected workspace invitations for workspace: %w", err)
+	}
+	return invitations, nil
+}
+
+
 func (r *WorkspaceInvitationsRepository) AcceptInvitation(ctx context.Context, id, invitedUserID int64) (sqlc.AcceptInvitationRow, error) {
 	params := sqlc.AcceptInvitationParams{
 		ID:            id,

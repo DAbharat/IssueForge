@@ -34,3 +34,15 @@ type WorkspacePendingInvitationResponse struct {
 	Fullname      string    `json:"fullname"`
 	CreatedAt     time.Time `json:"created_at"`
 }
+
+type WorkspaceRejectedInvitationResponse struct {
+	ID            int64      `json:"id"`
+	WorkspaceID   int64      `json:"workspace_id"`
+	InvitedUserID int64      `json:"invited_user_id"`
+	Username      string     `json:"username"`
+	Fullname      string     `json:"fullname"`
+	Status        string     `json:"status"`
+	CreatedAt     time.Time  `json:"created_at"`
+	RespondedAt   *time.Time `json:"responded_at,omitempty"`
+}
+

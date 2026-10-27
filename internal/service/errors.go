@@ -1,6 +1,9 @@
 package service
 
-import "errors"
+import (
+	"IssueForge/internal/auth"
+	"errors"
+)
 
 var (
 	ErrInvalidPassword               = errors.New("password must be atleast 8 and atmost 72 characters, containing uppercase, lowercase, numeric and special character")
@@ -37,7 +40,7 @@ var (
 	ErrInvalidStatus                 = errors.New("invalid status")
 	ErrInvalidPriority               = errors.New("invalid priority")
 	ErrInvalidAssignee               = errors.New("invalid assignee")
-	ErrForbidden                     = errors.New("forbidden")
+	ErrForbidden                     = auth.ErrForbidden
 	ErrCommentNotFound               = errors.New("comment not found")
 	ErrInvalidComment                = errors.New("invalid comment")
 	ErrInvalidCommentID              = errors.New("invalid comment id")

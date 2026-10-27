@@ -36,4 +36,8 @@ func registerIssueAttachmentsRoutes(r *mux.Router, issueAttachmentsHandler *hand
 	r.Handle("/api/attachments/{attachmentID}",
 		authMiddleware.Authenticate(http.HandlerFunc(issueAttachmentsHandler.SoftDeleteAttachments)),
 	).Methods("DELETE")
+
+	r.Handle("/api/attachments/{attachmentID}/restore",
+		authMiddleware.Authenticate(http.HandlerFunc(issueAttachmentsHandler.RestoreAttachment)),
+	).Methods("POST")
 }

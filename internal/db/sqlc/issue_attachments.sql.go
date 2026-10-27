@@ -132,6 +132,53 @@ func (q *Queries) GetAttachmentByID(ctx context.Context, id int64) (GetAttachmen
 	return i, err
 }
 
+const getAttachmentByIDIncludingDeleted = `-- name: GetAttachmentByIDIncludingDeleted :one
+SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.public_url, ia.created_at, ia.deleted_at,
+    uploader.fullname AS uploader_name, uploader.username AS uploader_username
+FROM issue_attachments ia
+JOIN users uploader ON ia.uploaded_by = uploader.id
+WHERE ia.id = $1
+`
+
+type GetAttachmentByIDIncludingDeletedRow struct {
+	ID               int64              `json:"id"`
+	IssueID          int64              `json:"issue_id"`
+	CommentID        pgtype.Int8        `json:"comment_id"`
+	UploadedBy       int64              `json:"uploaded_by"`
+	OriginalName     string             `json:"original_name"`
+	StorageKey       string             `json:"storage_key"`
+	ResourceType     string             `json:"resource_type"`
+	MimeType         string             `json:"mime_type"`
+	FileSize         int64              `json:"file_size"`
+	PublicUrl        string             `json:"public_url"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
+	UploaderName     string             `json:"uploader_name"`
+	UploaderUsername string             `json:"uploader_username"`
+}
+
+func (q *Queries) GetAttachmentByIDIncludingDeleted(ctx context.Context, id int64) (GetAttachmentByIDIncludingDeletedRow, error) {
+	row := q.db.QueryRow(ctx, getAttachmentByIDIncludingDeleted, id)
+	var i GetAttachmentByIDIncludingDeletedRow
+	err := row.Scan(
+		&i.ID,
+		&i.IssueID,
+		&i.CommentID,
+		&i.UploadedBy,
+		&i.OriginalName,
+		&i.StorageKey,
+		&i.ResourceType,
+		&i.MimeType,
+		&i.FileSize,
+		&i.PublicUrl,
+		&i.CreatedAt,
+		&i.DeletedAt,
+		&i.UploaderName,
+		&i.UploaderUsername,
+	)
+	return i, err
+}
+
 const listCommentAttachments = `-- name: ListCommentAttachments :many
 SELECT ia.id, ia.issue_id, ia.comment_id, ia.uploaded_by, ia.original_name, ia.storage_key, ia.resource_type, ia.mime_type, ia.file_size, ia.public_url, ia.created_at,
     uploader.fullname AS uploader_name, uploader.username AS uploader_username
@@ -248,6 +295,48 @@ func (q *Queries) ListIssueAttachments(ctx context.Context, issueID int64) ([]Li
 		return nil, err
 	}
 	return items, nil
+}
+
+const restoreDeletedAttachment = `-- name: RestoreDeletedAttachment :one
+UPDATE issue_attachments
+SET deleted_at = NULL
+WHERE id = $1 AND deleted_at IS NOT NULL
+RETURNING id, issue_id, comment_id, uploaded_by, original_name, storage_key, resource_type, mime_type, file_size, public_url, created_at, deleted_at
+`
+
+type RestoreDeletedAttachmentRow struct {
+	ID           int64              `json:"id"`
+	IssueID      int64              `json:"issue_id"`
+	CommentID    pgtype.Int8        `json:"comment_id"`
+	UploadedBy   int64              `json:"uploaded_by"`
+	OriginalName string             `json:"original_name"`
+	StorageKey   string             `json:"storage_key"`
+	ResourceType string             `json:"resource_type"`
+	MimeType     string             `json:"mime_type"`
+	FileSize     int64              `json:"file_size"`
+	PublicUrl    string             `json:"public_url"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
+}
+
+func (q *Queries) RestoreDeletedAttachment(ctx context.Context, id int64) (RestoreDeletedAttachmentRow, error) {
+	row := q.db.QueryRow(ctx, restoreDeletedAttachment, id)
+	var i RestoreDeletedAttachmentRow
+	err := row.Scan(
+		&i.ID,
+		&i.IssueID,
+		&i.CommentID,
+		&i.UploadedBy,
+		&i.OriginalName,
+		&i.StorageKey,
+		&i.ResourceType,
+		&i.MimeType,
+		&i.FileSize,
+		&i.PublicUrl,
+		&i.CreatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
 }
 
 const softDeleteAttachment = `-- name: SoftDeleteAttachment :one
