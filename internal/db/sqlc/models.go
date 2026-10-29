@@ -148,6 +148,55 @@ func (ns NullIssueStatus) Value() (driver.Value, error) {
 	return string(ns.IssueStatus), nil
 }
 
+type ProjectActivityType string
+
+const (
+	ProjectActivityTypePROJECTCREATED        ProjectActivityType = "PROJECT_CREATED"
+	ProjectActivityTypePROJECTDETAILSUPDATED ProjectActivityType = "PROJECT_DETAILS_UPDATED"
+	ProjectActivityTypePROJECTMEMBERADDED    ProjectActivityType = "PROJECT_MEMBER_ADDED"
+	ProjectActivityTypePROJECTMEMBERREMOVED  ProjectActivityType = "PROJECT_MEMBER_REMOVED"
+	ProjectActivityTypeNEWLEADASSIGNED       ProjectActivityType = "NEW_LEAD_ASSIGNED"
+	ProjectActivityTypePROJECTARCHIVED       ProjectActivityType = "PROJECT_ARCHIVED"
+	ProjectActivityTypePROJECTDELETED        ProjectActivityType = "PROJECT_DELETED"
+	ProjectActivityTypePROJECTRESTORED       ProjectActivityType = "PROJECT_RESTORED"
+	ProjectActivityTypeNEWISSUEADDED         ProjectActivityType = "NEW_ISSUE_ADDED"
+)
+
+func (e *ProjectActivityType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ProjectActivityType(s)
+	case string:
+		*e = ProjectActivityType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ProjectActivityType: %T", src)
+	}
+	return nil
+}
+
+type NullProjectActivityType struct {
+	ProjectActivityType ProjectActivityType `json:"project_activity_type"`
+	Valid               bool                `json:"valid"` // Valid is true if ProjectActivityType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullProjectActivityType) Scan(value interface{}) error {
+	if value == nil {
+		ns.ProjectActivityType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ProjectActivityType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullProjectActivityType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ProjectActivityType), nil
+}
+
 type UserRole string
 
 const (
@@ -268,6 +317,18 @@ type Project struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type ProjectActivity struct {
+	ID           int64               `json:"id"`
+	ProjectID    int64               `json:"project_id"`
+	ActorID      int64               `json:"actor_id"`
+	TargetUserID pgtype.Int8         `json:"target_user_id"`
+	ActivityType ProjectActivityType `json:"activity_type"`
+	FieldName    pgtype.Text         `json:"field_name"`
+	OldValue     pgtype.Text         `json:"old_value"`
+	NewValue     pgtype.Text         `json:"new_value"`
+	CreatedAt    pgtype.Timestamptz  `json:"created_at"`
 }
 
 type ProjectMember struct {

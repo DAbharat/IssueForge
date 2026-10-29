@@ -11,6 +11,7 @@ import (
 func New(userHandler *handler.UserHandler,
 	projectHandler *handler.ProjectHandler,
 	projectMemberHandler *handler.ProjectMemberHandler,
+	projectActivityHandler *handler.ProjectActivityHandler,
 	workspaceHandler *handler.WorkspaceHandler,
 	workspaceMemberHandler *handler.WorkspaceMemberHandler,
 	issueHandler *handler.IssueHandler,
@@ -39,6 +40,7 @@ func New(userHandler *handler.UserHandler,
 	registerUserRoutes(r, userHandler, authMiddleware, strictRateLimit, authRateLimit, readRateLimit, deleteRateLimit)
 	registerProjectRoutes(r, projectHandler, authMiddleware, readRateLimit, createRateLimit, patchRateLimit)
 	registerProjectMembersRoutes(r, projectMemberHandler, authMiddleware, readRateLimit)
+	registerProjectActivityRouter(r, projectActivityHandler, authMiddleware)
 	registerWorkspaceRoutes(r, workspaceHandler, authMiddleware, readRateLimit, createRateLimit, patchRateLimit)
 	registerWorkspaceMemberRoutes(r, workspaceMemberHandler, authMiddleware, readRateLimit, strictRateLimit)
 	registerIssueRoutes(r, issueHandler, authMiddleware, createRateLimit, readRateLimit, deleteRateLimit, patchRateLimit)

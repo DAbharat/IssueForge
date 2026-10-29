@@ -145,6 +145,10 @@ func main() {
 	projectMemberService := service.NewProjectMemberService(projectMemberRepo, authzService)
 	projectMemberHandler := handler.NewProjectMemberHandler(projectMemberService)
 
+	projectActivityRepo := repository.NewProjectActivityRepository(queries)
+	projectActivityService := service.NewProjectActivityService(projectActivityRepo, authzService)
+	projectActivityHandler := handler.NewProjectActivityHandler(projectActivityService)
+
 	workspaceMemberService := service.NewWorkspaceMemberService(workspaceMemberRepo, authzService)
 	workspaceMemberHandler := handler.NewWorkspaceMemberHandler(workspaceMemberService)
 
@@ -185,6 +189,7 @@ func main() {
 	r := router.New(userHandler,
 		projectHandler,
 		projectMemberHandler,
+		projectActivityHandler,
 		workspaceHandler,
 		workspaceMemberHandler,
 		issueHandler,
