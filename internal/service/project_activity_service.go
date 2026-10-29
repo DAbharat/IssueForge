@@ -10,8 +10,12 @@ import (
 )
 
 type ProjectActivityRepo interface {
-	CreateProjectActivity(ctx context.Context, projectID, actorID int64, targetUserID *int64, activityType string, fieldName, oldValue, newValue *string) (sqlc.CreateProjectActivityRow, error)
+	CreateProjectActivity(ctx context.Context, projectID, actorID int64, targetUserID *int64, activityType string, fieldName, oldValue, newValue *string) (sqlc.ProjectActivity, error)
 	ListProjectActivities(ctx context.Context, projectID int64, limit, offset int32) ([]sqlc.ListProjectActivitiesRow, error)
+}
+
+type ProjectActivityRecorder interface {
+	CreateProjectActivity(ctx context.Context, projectID, actorID int64, targetUserID *int64, activityType string, fieldName, oldValue, newValue *string) (dto.ProjectActivityResponse, error)
 }
 
 type ProjectActivityService struct {
@@ -97,6 +101,7 @@ func (s *ProjectActivityService) CreateProjectActivity(
 		FieldName:    field_name,
 		OldValue:     old_value,
 		NewValue:     new_value,
+		CreatedAt:    activity.CreatedAt.Time,
 	}, nil
 }
 
@@ -163,6 +168,7 @@ func (s *ProjectActivityService) ListProjectActivities(ctx context.Context, requ
 			FieldName:          field_name,
 			OldValue:           old_value,
 			NewValue:           new_value,
+			CreatedAt:          a.CreatedAt.Time,
 		})
 	}
 

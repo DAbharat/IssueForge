@@ -16,14 +16,16 @@ type ProjectMemberRepo interface {
 }
 
 type ProjectMemberService struct {
-	repo  ProjectMemberRepo
-	authz AuthzService
+	repo                   ProjectMemberRepo
+	projectActivityService ProjectActivityRecorder
+	authz                  AuthzService
 }
 
-func NewProjectMemberService(repo ProjectMemberRepo, authz AuthzService) *ProjectMemberService {
+func NewProjectMemberService(repo ProjectMemberRepo, projectActivityService ProjectActivityRecorder, authz AuthzService) *ProjectMemberService {
 	return &ProjectMemberService{
-		repo:  repo,
-		authz: authz,
+		repo:                   repo,
+		projectActivityService: projectActivityService,
+		authz:                  authz,
 	}
 }
 
@@ -41,6 +43,15 @@ func (s *ProjectMemberService) AddMemberToProject(ctx context.Context, projectID
 		}
 		return dto.ProjectMemberResponse{}, fmt.Errorf("add project member: %w", err)
 	}
+
+	if s.projectActivityService != nil {
+		targetUserID := userID
+		_, err = s.projectActivityService.CreateProjectActivity(ctx, projectID, userID, &targetUserID, "PROJECT_MEMBER_ADDED", nil, nil, nil)
+		if err != nil {
+			return dto.ProjectMemberResponse{}, fmt.Errorf("create project activity: %w", err)
+		}
+	}
+
 	return dto.ProjectMemberResponse{
 		ProjectID: member.ProjectID,
 		UserID:    member.UserID,
@@ -87,6 +98,15 @@ func (s *ProjectMemberService) SafeAddMemberToProject(ctx context.Context, req d
 		}
 		return dto.ProjectMemberResponse{}, fmt.Errorf("safe add project member: %w", err)
 	}
+
+	if s.projectActivityService != nil {
+		targetUserID := req.UserID
+		_, err = s.projectActivityService.CreateProjectActivity(ctx, projectID, leadID, &targetUserID, "PROJECT_MEMBER_ADDED", nil, nil, nil)
+		if err != nil {
+			return dto.ProjectMemberResponse{}, fmt.Errorf("create project activity: %w", err)
+		}
+	}
+
 	return dto.ProjectMemberResponse{
 		ProjectID: member.ProjectID,
 		UserID:    member.UserID,

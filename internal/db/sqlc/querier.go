@@ -26,7 +26,7 @@ type Querier interface {
 	CreateOIDCUser(ctx context.Context, arg CreateOIDCUserParams) (CreateOIDCUserRow, error)
 	CreateOnboardingUser(ctx context.Context, arg CreateOnboardingUserParams) (CreateOnboardingUserRow, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
-	CreateProjectActivity(ctx context.Context, arg CreateProjectActivityParams) (CreateProjectActivityRow, error)
+	CreateProjectActivity(ctx context.Context, arg CreateProjectActivityParams) (ProjectActivity, error)
 	CreateWorkspace(ctx context.Context, name string) (CreateWorkspaceRow, error)
 	CreateWorkspaceInvitation(ctx context.Context, arg CreateWorkspaceInvitationParams) (WorkspaceInvitation, error)
 	DeclineInvitation(ctx context.Context, arg DeclineInvitationParams) (DeclineInvitationRow, error)

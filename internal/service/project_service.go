@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -25,16 +26,18 @@ type ProjectRepo interface {
 }
 
 type ProjectService struct {
-	projectRepo  ProjectRepo
-	projectCache cache.ProjectCache
-	authz        AuthzService
+	projectRepo            ProjectRepo
+	projectCache           cache.ProjectCache
+	projectActivityService ProjectActivityRecorder
+	authz                  AuthzService
 }
 
-func NewProjectService(repo ProjectRepo, projectCache cache.ProjectCache, authz AuthzService) *ProjectService {
+func NewProjectService(repo ProjectRepo, projectCache cache.ProjectCache, projectActivityService ProjectActivityRecorder, authz AuthzService) *ProjectService {
 	return &ProjectService{
-		projectRepo:  repo,
-		projectCache: projectCache,
-		authz:        authz,
+		projectRepo:            repo,
+		projectCache:           projectCache,
+		projectActivityService: projectActivityService,
+		authz:                  authz,
 	}
 }
 
@@ -68,6 +71,13 @@ func (s *ProjectService) CreateProject(ctx context.Context, leadID int64, req dt
 		return dto.CreateProjectResponse{}, fmt.Errorf("create project service failure: %w", err)
 	}
 	log.Printf("service: workspaceID=%d leadID=%d", req.WorkspaceID, leadID)
+
+	if s.projectActivityService != nil {
+		_, err = s.projectActivityService.CreateProjectActivity(ctx, project.ID, leadID, nil, "PROJECT_CREATED", nil, nil, nil)
+		if err != nil {
+			return dto.CreateProjectResponse{}, fmt.Errorf("create project activity: %w", err)
+		}
+	}
 
 	return dto.CreateProjectResponse{
 		ID:          project.ID,
@@ -170,6 +180,27 @@ func (s *ProjectService) UpdateProjectDetails(ctx context.Context, requesterID i
 		return dto.ProjectResponse{}, fmt.Errorf("update project details: %w", err)
 	}
 
+	if s.projectActivityService != nil {
+		if req.Name != nil && dbProject.Name != *req.Name {
+			fieldName := "name"
+			oldVal := dbProject.Name
+			newVal := *req.Name
+			_, err = s.projectActivityService.CreateProjectActivity(ctx, project.ID, requesterID, nil, "PROJECT_DETAILS_UPDATED", &fieldName, &oldVal, &newVal)
+			if err != nil {
+				return dto.ProjectResponse{}, fmt.Errorf("create project activity: %w", err)
+			}
+		}
+		if req.Description != nil && dbProject.Description != *req.Description {
+			fieldName := "description"
+			oldVal := dbProject.Description
+			newVal := *req.Description
+			_, err = s.projectActivityService.CreateProjectActivity(ctx, project.ID, requesterID, nil, "PROJECT_DETAILS_UPDATED", &fieldName, &oldVal, &newVal)
+			if err != nil {
+				return dto.ProjectResponse{}, fmt.Errorf("create project activity: %w", err)
+			}
+		}
+	}
+
 	s.invalidateProjectCache(ctx, project.ID)
 
 	return dto.ProjectResponse{
@@ -221,6 +252,16 @@ func (s *ProjectService) UpdateProjectLead(ctx context.Context, requesterID int6
 		return dto.ProjectResponse{}, fmt.Errorf("update project lead :%w", err)
 	}
 
+	if s.projectActivityService != nil {
+		fieldName := "lead_id"
+		oldLead := strconv.FormatInt(dbProject.LeadID, 10)
+		newLead := strconv.FormatInt(*req.LeadID, 10)
+		_, err = s.projectActivityService.CreateProjectActivity(ctx, project.ID, requesterID, req.LeadID, "NEW_LEAD_ASSIGNED", &fieldName, &oldLead, &newLead)
+		if err != nil {
+			return dto.ProjectResponse{}, fmt.Errorf("create project activity: %w", err)
+		}
+	}
+
 	s.invalidateProjectCache(ctx, project.ID)
 
 	return dto.ProjectResponse{
@@ -260,6 +301,13 @@ func (s *ProjectService) DeleteProject(ctx context.Context, requesterID, project
 			return dto.ProjectResponse{}, ErrProjectNotFound
 		}
 		return dto.ProjectResponse{}, fmt.Errorf("delete project: %w", err)
+	}
+
+	if s.projectActivityService != nil {
+		_, err = s.projectActivityService.CreateProjectActivity(ctx, project.ID, requesterID, nil, "PROJECT_DELETED", nil, nil, nil)
+		if err != nil {
+			return dto.ProjectResponse{}, fmt.Errorf("create project activity: %w", err)
+		}
 	}
 
 	s.invalidateProjectCache(ctx, project.ID)
@@ -334,6 +382,13 @@ func (s *ProjectService) RestoreProject(ctx context.Context, requesterID, projec
 			return dto.ProjectResponse{}, ErrProjectNotFound
 		}
 		return dto.ProjectResponse{}, fmt.Errorf("restore project: %w", err)
+	}
+
+	if s.projectActivityService != nil {
+		_, err = s.projectActivityService.CreateProjectActivity(ctx, project.ID, requesterID, nil, "PROJECT_RESTORED", nil, nil, nil)
+		if err != nil {
+			return dto.ProjectResponse{}, fmt.Errorf("create project activity: %w", err)
+		}
 	}
 
 	s.invalidateProjectCache(ctx, project.ID)

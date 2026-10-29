@@ -137,17 +137,17 @@ func main() {
 	authzService := service.NewAuthorizationService(authzRepo)
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWTSecret)
 
-	projectRepo := repository.NewProjectRepository(pool, queries)
-	projectService := service.NewProjectService(projectRepo, projectCache, authzService)
-	projectHandler := handler.NewProjectHandler(projectService)
-
-	projectMemberRepo := repository.NewProjectMemberRepository(queries)
-	projectMemberService := service.NewProjectMemberService(projectMemberRepo, authzService)
-	projectMemberHandler := handler.NewProjectMemberHandler(projectMemberService)
-
 	projectActivityRepo := repository.NewProjectActivityRepository(queries)
 	projectActivityService := service.NewProjectActivityService(projectActivityRepo, authzService)
 	projectActivityHandler := handler.NewProjectActivityHandler(projectActivityService)
+
+	projectRepo := repository.NewProjectRepository(pool, queries)
+	projectService := service.NewProjectService(projectRepo, projectCache, projectActivityService, authzService)
+	projectHandler := handler.NewProjectHandler(projectService)
+
+	projectMemberRepo := repository.NewProjectMemberRepository(queries)
+	projectMemberService := service.NewProjectMemberService(projectMemberRepo, projectActivityService, authzService)
+	projectMemberHandler := handler.NewProjectMemberHandler(projectMemberService)
 
 	workspaceMemberService := service.NewWorkspaceMemberService(workspaceMemberRepo, authzService)
 	workspaceMemberHandler := handler.NewWorkspaceMemberHandler(workspaceMemberService)
@@ -161,7 +161,7 @@ func main() {
 	issueActivityRepo := repository.NewIssueActivityRepository(queries)
 	issueActivityService := service.NewIssueActivityService(issueActivityRepo, issueRepo, authzService)
 
-	issueService := service.NewIssueService(issueRepo, issueCache, issueActivityService, authzService)
+	issueService := service.NewIssueService(issueRepo, issueCache, issueActivityService, projectActivityService, authzService)
 	issueHandler := handler.NewIssueHandler(issueService)
 
 	commentRepo := repository.NewCommentRepository(queries)

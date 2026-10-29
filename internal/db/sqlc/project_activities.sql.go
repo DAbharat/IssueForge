@@ -23,7 +23,7 @@ INSERT INTO project_activities(
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7
 )
-RETURNING id, project_id, actor_id, target_user_id, activity_type, field_name, old_value, new_value
+RETURNING id, project_id, actor_id, target_user_id, activity_type, field_name, old_value, new_value, created_at
 `
 
 type CreateProjectActivityParams struct {
@@ -36,18 +36,7 @@ type CreateProjectActivityParams struct {
 	NewValue     pgtype.Text         `json:"new_value"`
 }
 
-type CreateProjectActivityRow struct {
-	ID           int64               `json:"id"`
-	ProjectID    int64               `json:"project_id"`
-	ActorID      int64               `json:"actor_id"`
-	TargetUserID pgtype.Int8         `json:"target_user_id"`
-	ActivityType ProjectActivityType `json:"activity_type"`
-	FieldName    pgtype.Text         `json:"field_name"`
-	OldValue     pgtype.Text         `json:"old_value"`
-	NewValue     pgtype.Text         `json:"new_value"`
-}
-
-func (q *Queries) CreateProjectActivity(ctx context.Context, arg CreateProjectActivityParams) (CreateProjectActivityRow, error) {
+func (q *Queries) CreateProjectActivity(ctx context.Context, arg CreateProjectActivityParams) (ProjectActivity, error) {
 	row := q.db.QueryRow(ctx, createProjectActivity,
 		arg.ProjectID,
 		arg.ActorID,
@@ -57,7 +46,7 @@ func (q *Queries) CreateProjectActivity(ctx context.Context, arg CreateProjectAc
 		arg.OldValue,
 		arg.NewValue,
 	)
-	var i CreateProjectActivityRow
+	var i ProjectActivity
 	err := row.Scan(
 		&i.ID,
 		&i.ProjectID,
@@ -67,12 +56,13 @@ func (q *Queries) CreateProjectActivity(ctx context.Context, arg CreateProjectAc
 		&i.FieldName,
 		&i.OldValue,
 		&i.NewValue,
+		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const listProjectActivities = `-- name: ListProjectActivities :many
-SELECT pa.id, pa.project_id, pa.actor_id, pa.target_user_id, pa.activity_type, pa.field_name, pa.old_value, pa.new_value,
+SELECT pa.id, pa.project_id, pa.actor_id, pa.target_user_id, pa.activity_type, pa.field_name, pa.old_value, pa.new_value, pa.created_at,
         u_actor.fullname, u_actor.username, u_target_user.fullname, u_target_user.username
 FROM project_activities pa
 INNER JOIN users u_actor ON pa.actor_id = u_actor.id
@@ -98,6 +88,7 @@ type ListProjectActivitiesRow struct {
 	FieldName    pgtype.Text         `json:"field_name"`
 	OldValue     pgtype.Text         `json:"old_value"`
 	NewValue     pgtype.Text         `json:"new_value"`
+	CreatedAt    pgtype.Timestamptz  `json:"created_at"`
 	Fullname     string              `json:"fullname"`
 	Username     string              `json:"username"`
 	Fullname_2   pgtype.Text         `json:"fullname_2"`
@@ -122,6 +113,7 @@ func (q *Queries) ListProjectActivities(ctx context.Context, arg ListProjectActi
 			&i.FieldName,
 			&i.OldValue,
 			&i.NewValue,
+			&i.CreatedAt,
 			&i.Fullname,
 			&i.Username,
 			&i.Fullname_2,

@@ -26,7 +26,7 @@ func (r *ProjectActivityRepository) CreateProjectActivity(
 	targetUserID *int64,
 	activityType string,
 	fieldName, oldValue, newValue *string,
-) (sqlc.CreateProjectActivityRow, error) {
+) (sqlc.ProjectActivity, error) {
 	var target_user_id pgtype.Int8
 	var field_name pgtype.Text
 	var old_value pgtype.Text
@@ -67,15 +67,15 @@ func (r *ProjectActivityRepository) CreateProjectActivity(
 			case "23503":
 				switch pgErr.ConstraintName {
 				case "project_activities_project_id_fkey":
-					return sqlc.CreateProjectActivityRow{}, ErrProjectNotFound
+					return sqlc.ProjectActivity{}, ErrProjectNotFound
 				case "project_activities_actor_id_fkey", "project_activities_target_user_id_fkey":
-					return sqlc.CreateProjectActivityRow{}, ErrUserNotFound
+					return sqlc.ProjectActivity{}, ErrUserNotFound
 				}
 			case "22P02":
-				return sqlc.CreateProjectActivityRow{}, ErrInvalidActivityType
+				return sqlc.ProjectActivity{}, ErrInvalidActivityType
 			}
 		}
-		return sqlc.CreateProjectActivityRow{}, fmt.Errorf("create project activity: %w", err)
+		return sqlc.ProjectActivity{}, fmt.Errorf("create project activity: %w", err)
 	}
 
 	return activity, nil

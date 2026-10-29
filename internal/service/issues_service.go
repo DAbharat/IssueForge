@@ -35,18 +35,20 @@ type ActivityService interface {
 }
 
 type IssueService struct {
-	repo         IssueRepo
-	issueCache   cache.IssueCache
-	activityRepo ActivityService
-	authz        AuthzService
+	repo                   IssueRepo
+	issueCache             cache.IssueCache
+	activityRepo           ActivityService
+	projectActivityService ProjectActivityRecorder
+	authz                  AuthzService
 }
 
-func NewIssueService(repo IssueRepo, issueCache cache.IssueCache, activity ActivityService, authz AuthzService) *IssueService {
+func NewIssueService(repo IssueRepo, issueCache cache.IssueCache, activity ActivityService, projectActivity ProjectActivityRecorder, authz AuthzService) *IssueService {
 	return &IssueService{
-		repo:         repo,
-		issueCache:   issueCache,
-		activityRepo: activity,
-		authz:        authz,
+		repo:                   repo,
+		issueCache:             issueCache,
+		activityRepo:           activity,
+		projectActivityService: projectActivity,
+		authz:                  authz,
 	}
 }
 
@@ -116,6 +118,15 @@ func (s *IssueService) CreateIssue(ctx context.Context, creatorID int64, req dto
 	_, err = s.activityRepo.CreateActivity(ctx, issue.ID, creatorID, "ISSUE_CREATED", nil, nil, nil)
 	if err != nil {
 		return dto.CreateIssueResponse{}, fmt.Errorf("create activity: %w", err)
+	}
+
+	if s.projectActivityService != nil {
+		fieldName := "title"
+		issueTitleVal := issueTitle
+		_, err = s.projectActivityService.CreateProjectActivity(ctx, req.ProjectID, creatorID, nil, "NEW_ISSUE_ADDED", &fieldName, nil, &issueTitleVal)
+		if err != nil {
+			return dto.CreateIssueResponse{}, fmt.Errorf("create project activity: %w", err)
+		}
 	}
 
 	var assignedTo *int64
