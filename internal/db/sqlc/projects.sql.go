@@ -72,6 +72,56 @@ func (q *Queries) DeleteProject(ctx context.Context, id int64) (DeleteProjectRow
 	return i, err
 }
 
+const getProjectActivityTypeBreakdown = `-- name: GetProjectActivityTypeBreakdown :many
+SELECT activity_type::text, COUNT(*)::BIGINT AS count
+FROM (
+    SELECT ia.activity_type::text AS activity_type
+    FROM issue_activities ia
+    JOIN issues i ON ia.issue_id = i.id
+    WHERE i.project_id = $1
+      AND ia.created_at >= $2::timestamptz
+
+    UNION ALL
+
+    SELECT pa.activity_type::text AS activity_type
+    FROM project_activities pa
+    WHERE pa.project_id = $1
+      AND pa.created_at >= $2::timestamptz
+) events
+GROUP BY activity_type
+ORDER BY count DESC
+`
+
+type GetProjectActivityTypeBreakdownParams struct {
+	ProjectID int64              `json:"project_id"`
+	StartDate pgtype.Timestamptz `json:"start_date"`
+}
+
+type GetProjectActivityTypeBreakdownRow struct {
+	ActivityType string `json:"activity_type"`
+	Count        int64  `json:"count"`
+}
+
+func (q *Queries) GetProjectActivityTypeBreakdown(ctx context.Context, arg GetProjectActivityTypeBreakdownParams) ([]GetProjectActivityTypeBreakdownRow, error) {
+	rows, err := q.db.Query(ctx, getProjectActivityTypeBreakdown, arg.ProjectID, arg.StartDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetProjectActivityTypeBreakdownRow
+	for rows.Next() {
+		var i GetProjectActivityTypeBreakdownRow
+		if err := rows.Scan(&i.ActivityType, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getProjectByID = `-- name: GetProjectByID :one
 SELECT p.id, p.workspace_id, p.lead_id, p.name, p.description, p.created_at, p.updated_at,
     u.fullname as lead_name
@@ -145,6 +195,112 @@ func (q *Queries) GetProjectByIDIncludingDeleted(ctx context.Context, id int64) 
 		&i.WorkspaceDeletedAt,
 	)
 	return i, err
+}
+
+const getProjectDailyActivityStats = `-- name: GetProjectDailyActivityStats :many
+WITH all_project_events AS (
+    SELECT ia.created_at::date AS event_date, ia.activity_type::text AS event_type
+    FROM issue_activities ia
+    JOIN issues i ON ia.issue_id = i.id
+    WHERE i.project_id = $1
+      AND ia.created_at >= $2::timestamptz 
+      AND ia.created_at <= $3::timestamptz
+
+    UNION ALL
+
+    SELECT pa.created_at::date AS event_date, pa.activity_type::text AS event_type
+    FROM project_activities pa
+    WHERE pa.project_id = $1
+      AND pa.created_at >= $2::timestamptz 
+      AND pa.created_at <= $3::timestamptz
+)
+SELECT event_date, COUNT(*)::BIGINT AS total_activities
+FROM all_project_events
+GROUP BY event_date
+ORDER BY event_date ASC
+`
+
+type GetProjectDailyActivityStatsParams struct {
+	ProjectID int64              `json:"project_id"`
+	StartDate pgtype.Timestamptz `json:"start_date"`
+	EndDate   pgtype.Timestamptz `json:"end_date"`
+}
+
+type GetProjectDailyActivityStatsRow struct {
+	EventDate       pgtype.Date `json:"event_date"`
+	TotalActivities int64       `json:"total_activities"`
+}
+
+func (q *Queries) GetProjectDailyActivityStats(ctx context.Context, arg GetProjectDailyActivityStatsParams) ([]GetProjectDailyActivityStatsRow, error) {
+	rows, err := q.db.Query(ctx, getProjectDailyActivityStats, arg.ProjectID, arg.StartDate, arg.EndDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetProjectDailyActivityStatsRow
+	for rows.Next() {
+		var i GetProjectDailyActivityStatsRow
+		if err := rows.Scan(&i.EventDate, &i.TotalActivities); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProjectIssueVelocityStats = `-- name: GetProjectIssueVelocityStats :many
+SELECT d.date_bucket::date AS date,
+COUNT(DISTINCT i.id) FILTER (WHERE i.created_at::date = d.date_bucket::date) AS issues_created,
+COUNT(DISTINCT ia.id) FILTER (
+    WHERE ia.activity_type = 'ISSUE_STATUS_CHANGED'
+    AND ia.new_value = 'DONE'
+    AND ia.created_at::date = d.date_bucket::date
+) AS issues_completed
+FROM generate_series($1::timestamptz, $2::timestamptz, '1 day'::interval) d(date_bucket)
+LEFT JOIN issues i
+ON i.project_id = $3
+AND i.deleted_at IS NULL
+AND i.created_at::date = d.date_bucket::date
+LEFT JOIN issue_activities ia
+ON ia.created_at::date = d.date_bucket::date
+AND ia.issue_id IN (SELECT id FROM issues WHERE project_id = $3)
+GROUP BY d.date_bucket
+ORDER BY d.date_bucket ASC
+`
+
+type GetProjectIssueVelocityStatsParams struct {
+	StartDate pgtype.Timestamptz `json:"start_date"`
+	EndDate   pgtype.Timestamptz `json:"end_date"`
+	ProjectID int64              `json:"project_id"`
+}
+
+type GetProjectIssueVelocityStatsRow struct {
+	Date            pgtype.Date `json:"date"`
+	IssuesCreated   int64       `json:"issues_created"`
+	IssuesCompleted int64       `json:"issues_completed"`
+}
+
+func (q *Queries) GetProjectIssueVelocityStats(ctx context.Context, arg GetProjectIssueVelocityStatsParams) ([]GetProjectIssueVelocityStatsRow, error) {
+	rows, err := q.db.Query(ctx, getProjectIssueVelocityStats, arg.StartDate, arg.EndDate, arg.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetProjectIssueVelocityStatsRow
+	for rows.Next() {
+		var i GetProjectIssueVelocityStatsRow
+		if err := rows.Scan(&i.Date, &i.IssuesCreated, &i.IssuesCompleted); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const isProjectLead = `-- name: IsProjectLead :one

@@ -81,6 +81,83 @@ func (q *Queries) GetWorkspaceMember(ctx context.Context, arg GetWorkspaceMember
 	return i, err
 }
 
+const getWorkspaceMemberActivityStats = `-- name: GetWorkspaceMemberActivityStats :many
+SELECT 
+    u.id AS user_id,
+    u.fullname,
+    u.username,
+    u.email,
+    COUNT(ia.id)::BIGINT AS issue_actions_count,
+    COUNT(DISTINCT i.id) FILTER (WHERE i.status = 'DONE')::BIGINT AS completed_issues_count
+FROM workspace_members wm
+JOIN users u ON wm.user_id = u.id
+JOIN workspaces w ON wm.workspace_id = w.id
+LEFT JOIN (
+    SELECT act.id, act.actor_id
+    FROM issue_activities act
+    JOIN issues iss ON act.issue_id = iss.id
+    JOIN projects p ON iss.project_id = p.id
+    WHERE p.workspace_id = $1
+      AND p.deleted_at IS NULL
+      AND act.created_at >= $2::timestamptz
+) ia ON ia.actor_id = u.id
+LEFT JOIN (
+    SELECT iss.id, iss.assigned_to, iss.status
+    FROM issues iss
+    JOIN projects p ON iss.project_id = p.id
+    WHERE p.workspace_id = $1
+      AND p.deleted_at IS NULL
+      AND iss.deleted_at IS NULL
+) i ON i.assigned_to = u.id
+WHERE wm.workspace_id = $1
+  AND w.deleted_at IS NULL
+GROUP BY u.id, u.fullname, u.username, u.email
+ORDER BY issue_actions_count DESC
+LIMIT $3
+`
+
+type GetWorkspaceMemberActivityStatsParams struct {
+	WorkspaceID int64              `json:"workspace_id"`
+	StartDate   pgtype.Timestamptz `json:"start_date"`
+	PageLimit   int32              `json:"page_limit"`
+}
+
+type GetWorkspaceMemberActivityStatsRow struct {
+	UserID               int64  `json:"user_id"`
+	Fullname             string `json:"fullname"`
+	Username             string `json:"username"`
+	Email                string `json:"email"`
+	IssueActionsCount    int64  `json:"issue_actions_count"`
+	CompletedIssuesCount int64  `json:"completed_issues_count"`
+}
+
+func (q *Queries) GetWorkspaceMemberActivityStats(ctx context.Context, arg GetWorkspaceMemberActivityStatsParams) ([]GetWorkspaceMemberActivityStatsRow, error) {
+	rows, err := q.db.Query(ctx, getWorkspaceMemberActivityStats, arg.WorkspaceID, arg.StartDate, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetWorkspaceMemberActivityStatsRow
+	for rows.Next() {
+		var i GetWorkspaceMemberActivityStatsRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Fullname,
+			&i.Username,
+			&i.Email,
+			&i.IssueActionsCount,
+			&i.CompletedIssuesCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const isWorkspaceAdminIncludingDeleted = `-- name: IsWorkspaceAdminIncludingDeleted :one
 SELECT wm.role
 FROM workspace_members wm

@@ -186,6 +186,10 @@ func main() {
 	archiveService := service.NewArchiveService(archiveRepo)
 	archiveHandler := handler.NewArchiveHandler(archiveService)
 
+	analyticsRepo := repository.NewAnalyticsRepository(queries)
+	analyticsService := service.NewAnalyticsService(analyticsRepo, authzService)
+	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
+
 	r := router.New(userHandler,
 		projectHandler,
 		projectMemberHandler,
@@ -199,6 +203,7 @@ func main() {
 		labelsHandler,
 		workspaceInvitationHandler,
 		archiveHandler,
+		analyticsHandler,
 		authMiddleware,
 		reg,
 		strictRateLimit,

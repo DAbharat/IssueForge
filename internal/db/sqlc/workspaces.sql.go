@@ -53,6 +53,60 @@ func (q *Queries) DeleteWorkspace(ctx context.Context, id int64) (int64, error) 
 	return id, err
 }
 
+const getWorkspaceActivityTypeBreakdown = `-- name: GetWorkspaceActivityTypeBreakdown :many
+SELECT activity_type::text, COUNT(*)::BIGINT AS count
+FROM (
+    SELECT ia.activity_type::text AS activity_type
+    FROM issue_activities ia
+    JOIN issues i ON ia.issue_id = i.id
+    JOIN projects p ON i.project_id = p.id
+    WHERE p.workspace_id = $1 
+      AND p.deleted_at IS NULL
+      AND ia.created_at >= $2::timestamptz
+
+    UNION ALL
+
+    SELECT pa.activity_type::text AS activity_type
+    FROM project_activities pa
+    JOIN projects p ON pa.project_id = p.id
+    WHERE p.workspace_id = $1 
+      AND p.deleted_at IS NULL
+      AND pa.created_at >= $2::timestamptz
+) events
+GROUP BY activity_type
+ORDER BY count DESC
+`
+
+type GetWorkspaceActivityTypeBreakdownParams struct {
+	WorkspaceID int64              `json:"workspace_id"`
+	StartDate   pgtype.Timestamptz `json:"start_date"`
+}
+
+type GetWorkspaceActivityTypeBreakdownRow struct {
+	ActivityType string `json:"activity_type"`
+	Count        int64  `json:"count"`
+}
+
+func (q *Queries) GetWorkspaceActivityTypeBreakdown(ctx context.Context, arg GetWorkspaceActivityTypeBreakdownParams) ([]GetWorkspaceActivityTypeBreakdownRow, error) {
+	rows, err := q.db.Query(ctx, getWorkspaceActivityTypeBreakdown, arg.WorkspaceID, arg.StartDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetWorkspaceActivityTypeBreakdownRow
+	for rows.Next() {
+		var i GetWorkspaceActivityTypeBreakdownRow
+		if err := rows.Scan(&i.ActivityType, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getWorkspaceByID = `-- name: GetWorkspaceByID :one
 SELECT id, name, created_at, updated_at
 FROM workspaces
@@ -101,6 +155,125 @@ func (q *Queries) GetWorkspaceByName(ctx context.Context, name string) (GetWorks
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getWorkspaceDailyActivityStats = `-- name: GetWorkspaceDailyActivityStats :many
+WITH all_workspace_events AS (
+    SELECT ia.created_at::date AS event_date, p.id AS project_id
+    FROM issue_activities ia
+    JOIN issues i ON ia.issue_id = i.id
+    JOIN projects p ON i.project_id = p.id
+    WHERE p.workspace_id = $1
+      AND p.deleted_at IS NULL
+      AND ia.created_at >= $2::timestamptz 
+      AND ia.created_at <= $3::timestamptz
+
+    UNION ALL
+
+    SELECT pa.created_at::date AS event_date, p.id AS project_id
+    FROM project_activities pa
+    JOIN projects p ON pa.project_id = p.id
+    WHERE p.workspace_id = $1
+      AND p.deleted_at IS NULL
+      AND pa.created_at >= $2::timestamptz 
+      AND pa.created_at <= $3::timestamptz
+)
+SELECT event_date, COUNT(*)::BIGINT AS total_activities
+FROM all_workspace_events
+GROUP BY event_date
+ORDER BY event_date ASC
+`
+
+type GetWorkspaceDailyActivityStatsParams struct {
+	WorkspaceID int64              `json:"workspace_id"`
+	StartDate   pgtype.Timestamptz `json:"start_date"`
+	EndDate     pgtype.Timestamptz `json:"end_date"`
+}
+
+type GetWorkspaceDailyActivityStatsRow struct {
+	EventDate       pgtype.Date `json:"event_date"`
+	TotalActivities int64       `json:"total_activities"`
+}
+
+func (q *Queries) GetWorkspaceDailyActivityStats(ctx context.Context, arg GetWorkspaceDailyActivityStatsParams) ([]GetWorkspaceDailyActivityStatsRow, error) {
+	rows, err := q.db.Query(ctx, getWorkspaceDailyActivityStats, arg.WorkspaceID, arg.StartDate, arg.EndDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetWorkspaceDailyActivityStatsRow
+	for rows.Next() {
+		var i GetWorkspaceDailyActivityStatsRow
+		if err := rows.Scan(&i.EventDate, &i.TotalActivities); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getWorkspaceIssueVelocityStats = `-- name: GetWorkspaceIssueVelocityStats :many
+SELECT d.date_bucket::date AS date,
+COUNT(DISTINCT i.id) FILTER (WHERE i.created_at::date = d.date_bucket::date) AS issues_created,
+COUNT(DISTINCT ia.id) FILTER (
+    WHERE ia.activity_type = 'ISSUE_STATUS_CHANGED'
+    AND ia.new_value = 'DONE'
+    AND ia.created_at::date = d.date_bucket::date
+) AS issues_completed
+FROM generate_series($1::timestamptz, $2::timestamptz, '1 day'::interval) d(date_bucket)
+LEFT JOIN (
+    SELECT iss.id, iss.created_at
+    FROM issues iss
+    JOIN projects p ON iss.project_id = p.id
+    WHERE p.workspace_id = $3
+      AND p.deleted_at IS NULL
+      AND iss.deleted_at IS NULL
+) i ON i.created_at::date = d.date_bucket::date
+LEFT JOIN (
+    SELECT act.id, act.activity_type, act.new_value, act.created_at
+    FROM issue_activities act
+    JOIN issues iss ON act.issue_id = iss.id
+    JOIN projects p ON iss.project_id = p.id
+    WHERE p.workspace_id = $3
+      AND p.deleted_at IS NULL
+) ia ON ia.created_at::date = d.date_bucket::date
+GROUP BY d.date_bucket
+ORDER BY d.date_bucket ASC
+`
+
+type GetWorkspaceIssueVelocityStatsParams struct {
+	StartDate   pgtype.Timestamptz `json:"start_date"`
+	EndDate     pgtype.Timestamptz `json:"end_date"`
+	WorkspaceID int64              `json:"workspace_id"`
+}
+
+type GetWorkspaceIssueVelocityStatsRow struct {
+	Date            pgtype.Date `json:"date"`
+	IssuesCreated   int64       `json:"issues_created"`
+	IssuesCompleted int64       `json:"issues_completed"`
+}
+
+func (q *Queries) GetWorkspaceIssueVelocityStats(ctx context.Context, arg GetWorkspaceIssueVelocityStatsParams) ([]GetWorkspaceIssueVelocityStatsRow, error) {
+	rows, err := q.db.Query(ctx, getWorkspaceIssueVelocityStats, arg.StartDate, arg.EndDate, arg.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetWorkspaceIssueVelocityStatsRow
+	for rows.Next() {
+		var i GetWorkspaceIssueVelocityStatsRow
+		if err := rows.Scan(&i.Date, &i.IssuesCreated, &i.IssuesCompleted); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const restoreDeletedWorkspace = `-- name: RestoreDeletedWorkspace :one

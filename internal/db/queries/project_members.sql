@@ -51,3 +51,35 @@ SELECT EXISTS (
     AND wm.user_id = pm.user_id
     WHERE pm.project_id = $1 AND pm.user_id = $2
 );
+
+
+-- name: GetProjectMemberActivityStats :many
+SELECT 
+    u.id AS user_id,
+    u.fullname,
+    u.username,
+    u.email,
+    COUNT(ia.id)::BIGINT AS issue_actions_count,
+    COUNT(DISTINCT i.id) FILTER (WHERE i.status = 'DONE')::BIGINT AS completed_issues_count
+FROM project_members pm
+JOIN users u ON pm.user_id = u.id
+JOIN projects p ON pm.project_id = p.id
+LEFT JOIN (
+    SELECT act.id, act.actor_id
+    FROM issue_activities act
+    JOIN issues iss ON act.issue_id = iss.id
+    WHERE iss.project_id = sqlc.arg(project_id)
+      AND iss.deleted_at IS NULL
+      AND act.created_at >= sqlc.arg(start_date)::timestamptz
+) ia ON ia.actor_id = u.id
+LEFT JOIN (
+    SELECT iss.id, iss.assigned_to, iss.status
+    FROM issues iss
+    WHERE iss.project_id = sqlc.arg(project_id)
+      AND iss.deleted_at IS NULL
+) i ON i.assigned_to = u.id
+WHERE pm.project_id = sqlc.arg(project_id)
+  AND p.deleted_at IS NULL
+GROUP BY u.id, u.fullname, u.username, u.email
+ORDER BY issue_actions_count DESC
+LIMIT sqlc.arg(page_limit);

@@ -34,6 +34,80 @@ func (q *Queries) AddMemberToProject(ctx context.Context, arg AddMemberToProject
 	return i, err
 }
 
+const getProjectMemberActivityStats = `-- name: GetProjectMemberActivityStats :many
+SELECT 
+    u.id AS user_id,
+    u.fullname,
+    u.username,
+    u.email,
+    COUNT(ia.id)::BIGINT AS issue_actions_count,
+    COUNT(DISTINCT i.id) FILTER (WHERE i.status = 'DONE')::BIGINT AS completed_issues_count
+FROM project_members pm
+JOIN users u ON pm.user_id = u.id
+JOIN projects p ON pm.project_id = p.id
+LEFT JOIN (
+    SELECT act.id, act.actor_id
+    FROM issue_activities act
+    JOIN issues iss ON act.issue_id = iss.id
+    WHERE iss.project_id = $1
+      AND iss.deleted_at IS NULL
+      AND act.created_at >= $2::timestamptz
+) ia ON ia.actor_id = u.id
+LEFT JOIN (
+    SELECT iss.id, iss.assigned_to, iss.status
+    FROM issues iss
+    WHERE iss.project_id = $1
+      AND iss.deleted_at IS NULL
+) i ON i.assigned_to = u.id
+WHERE pm.project_id = $1
+  AND p.deleted_at IS NULL
+GROUP BY u.id, u.fullname, u.username, u.email
+ORDER BY issue_actions_count DESC
+LIMIT $3
+`
+
+type GetProjectMemberActivityStatsParams struct {
+	ProjectID int64              `json:"project_id"`
+	StartDate pgtype.Timestamptz `json:"start_date"`
+	PageLimit int32              `json:"page_limit"`
+}
+
+type GetProjectMemberActivityStatsRow struct {
+	UserID               int64  `json:"user_id"`
+	Fullname             string `json:"fullname"`
+	Username             string `json:"username"`
+	Email                string `json:"email"`
+	IssueActionsCount    int64  `json:"issue_actions_count"`
+	CompletedIssuesCount int64  `json:"completed_issues_count"`
+}
+
+func (q *Queries) GetProjectMemberActivityStats(ctx context.Context, arg GetProjectMemberActivityStatsParams) ([]GetProjectMemberActivityStatsRow, error) {
+	rows, err := q.db.Query(ctx, getProjectMemberActivityStats, arg.ProjectID, arg.StartDate, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetProjectMemberActivityStatsRow
+	for rows.Next() {
+		var i GetProjectMemberActivityStatsRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Fullname,
+			&i.Username,
+			&i.Email,
+			&i.IssueActionsCount,
+			&i.CompletedIssuesCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const isProjectMember = `-- name: IsProjectMember :one
 SELECT EXISTS (
     SELECT 1
