@@ -21,6 +21,7 @@ type CommentRepo interface {
 
 type IssueLookupRepo interface {
 	GetIssueProjectID(ctx context.Context, issueID int64) (int64, error)
+	GetIssueByID(ctx context.Context, id int64) (sqlc.GetIssueByIDRow, error)
 }
 
 type CommentService struct {
@@ -28,14 +29,16 @@ type CommentService struct {
 	issueRepo    IssueLookupRepo
 	activityRepo ActivityService
 	authz        AuthzService
+	notifier     NotificationSender
 }
 
-func NewCommentService(repo CommentRepo, issueRepo IssueLookupRepo, activity ActivityService, authz AuthzService) *CommentService {
+func NewCommentService(repo CommentRepo, issueRepo IssueLookupRepo, activity ActivityService, authz AuthzService, notifier NotificationSender) *CommentService {
 	return &CommentService{
 		repo:         repo,
 		issueRepo:    issueRepo,
 		activityRepo: activity,
 		authz:        authz,
+		notifier:     notifier,
 	}
 }
 
@@ -86,6 +89,48 @@ func (s *CommentService) CreateComment(ctx context.Context, requesterID int64, r
 	_, err = s.activityRepo.CreateActivity(ctx, comment.IssueID, requesterID, "COMMENT_CREATED", nil, nil, nil)
 	if err != nil {
 		return dto.CommentResponse{}, err
+	}
+
+	if s.notifier != nil {
+		var parentAuthorID int64
+		if req.ParentCommentID != nil {
+			parentComment, pErr := s.repo.GetCommentByID(ctx, *req.ParentCommentID)
+			if pErr == nil && parentComment.AuthorID != requesterID {
+				parentAuthorID = parentComment.AuthorID
+				if err := s.notifier.SendNotification(
+					ctx,
+					parentComment.AuthorID,
+					&requesterID,
+					"COMMENT_REPLY",
+					"New Reply to Your Comment",
+					fmt.Sprintf("Someone replied to your comment on issue #%d", comment.IssueID),
+					&projectID, &comment.IssueID, nil,
+				); err != nil {
+					fmt.Printf("failed to send notification: %v\n", err)
+				}
+			}
+		}
+
+		issueData, iErr := s.issueRepo.GetIssueByID(ctx, comment.IssueID)
+		if iErr == nil {
+			targetUserID := issueData.CreatedBy
+			if issueData.AssignedTo.Valid {
+				targetUserID = issueData.AssignedTo.Int64
+			}
+			if targetUserID != requesterID && targetUserID != parentAuthorID {
+				if err := s.notifier.SendNotification(
+					ctx,
+					targetUserID,
+					&requesterID,
+					"ISSUE_COMMENT_ADDED",
+					"New Comment on Issue",
+					fmt.Sprintf("New comment added on issue '%s'", issueData.Title),
+					&projectID, &comment.IssueID, nil,
+				); err != nil {
+					fmt.Printf("failed to send notification: %v\n", err)
+				}
+			}
+		}
 	}
 
 	var parentComment *int64

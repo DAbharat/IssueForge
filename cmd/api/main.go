@@ -102,6 +102,18 @@ func main() {
 		log.Fatalf("initialize attachment delete worker: %v", err)
 	}
 
+	createNotificationQueue, err := queue.NewCreateNotificationQueue(queueClient)
+	if err != nil {
+		log.Fatalf("initialize create notification queue: %v", err)
+	}
+	defer createNotificationQueue.Close()
+
+	deleteAllNotificationQueue, err := queue.NewDeleteAllNotificationsQueue(queueClient)
+	if err != nil {
+		log.Fatalf("initialize delete all notification queue: %v", err)
+	}
+	defer deleteAllNotificationQueue.Close()
+
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 
@@ -128,6 +140,29 @@ func main() {
 
 	handoffStore := handoff.NewStore(redisClient)
 
+	notificationRepo := repository.NewNotificationRepository(queries)
+	notificationService := service.NewNotificationService(notificationRepo, createNotificationQueue, deleteAllNotificationQueue)
+
+	notificationCreateWorker, err := queue.NewNotificationCreateWorker(workerClient, notificationRepo)
+	if err != nil {
+		log.Fatalf("initialize notification create worker: %v", err)
+	}
+	go func() {
+		if err := notificationCreateWorker.Run(workerCtx); err != nil {
+			log.Printf("notification create worker stopped: %v", err)
+		}
+	}()
+
+	notificationDeleteWorker, err := queue.NewNotificationDeleteWorker(workerClient, notificationRepo)
+	if err != nil {
+		log.Fatalf("initialize notification delete worker: %v", err)
+	}
+	go func() {
+		if err := notificationDeleteWorker.Run(workerCtx); err != nil {
+			log.Printf("notification delete worker stopped: %v", err)
+		}
+	}()
+
 	userRepo := repository.NewUserRepository(queries)
 	workspaceMemberRepo := repository.NewWorkspaceMemberRepository(queries)
 	userService := service.NewUserService(userRepo, workspaceMemberRepo, cfg.JWTSecret, refreshToken, googleOIDC, handoffStore)
@@ -142,18 +177,18 @@ func main() {
 	projectActivityHandler := handler.NewProjectActivityHandler(projectActivityService)
 
 	projectRepo := repository.NewProjectRepository(pool, queries)
-	projectService := service.NewProjectService(projectRepo, projectCache, projectActivityService, authzService)
+	projectService := service.NewProjectService(projectRepo, projectCache, projectActivityService, authzService, notificationService)
 	projectHandler := handler.NewProjectHandler(projectService)
 
 	projectMemberRepo := repository.NewProjectMemberRepository(queries)
-	projectMemberService := service.NewProjectMemberService(projectMemberRepo, projectActivityService, authzService)
+	projectMemberService := service.NewProjectMemberService(projectMemberRepo, projectActivityService, authzService, notificationService)
 	projectMemberHandler := handler.NewProjectMemberHandler(projectMemberService)
 
-	workspaceMemberService := service.NewWorkspaceMemberService(workspaceMemberRepo, authzService)
+	workspaceMemberService := service.NewWorkspaceMemberService(workspaceMemberRepo, authzService, notificationService)
 	workspaceMemberHandler := handler.NewWorkspaceMemberHandler(workspaceMemberService)
 
 	workspaceRepo := repository.NewWorkspaceRepository(queries)
-	workspaceService := service.NewWorkspaceService(workspaceRepo, workspaceCache, workspaceMemberRepo, authzService)
+	workspaceService := service.NewWorkspaceService(workspaceRepo, workspaceCache, workspaceMemberRepo, authzService, notificationService)
 	workspaceHandler := handler.NewWorkspaceHandler(workspaceService)
 
 	issueRepo := repository.NewIssueRepository(queries)
@@ -161,11 +196,11 @@ func main() {
 	issueActivityRepo := repository.NewIssueActivityRepository(queries)
 	issueActivityService := service.NewIssueActivityService(issueActivityRepo, issueRepo, authzService)
 
-	issueService := service.NewIssueService(issueRepo, issueCache, issueActivityService, projectActivityService, authzService)
+	issueService := service.NewIssueService(issueRepo, issueCache, issueActivityService, projectActivityService, authzService, notificationService)
 	issueHandler := handler.NewIssueHandler(issueService)
 
 	commentRepo := repository.NewCommentRepository(queries)
-	commentService := service.NewCommentService(commentRepo, issueRepo, issueActivityService, authzService)
+	commentService := service.NewCommentService(commentRepo, issueRepo, issueActivityService, authzService, notificationService)
 	commentHandler := handler.NewCommentHandler(commentService)
 
 	issueActivityHandler := handler.NewIssueActivityHandler(issueActivityService)
@@ -179,7 +214,7 @@ func main() {
 	labelsHandler := handler.NewLabelsHandler(labelsService)
 
 	workspaceInvitationRepo := repository.NewWorkspaceInvitationRepository(pool, queries)
-	workspaceInvitationService := service.NewWorkspaceInvitationService(workspaceInvitationRepo, workspaceInvitationCache, authzService)
+	workspaceInvitationService := service.NewWorkspaceInvitationService(workspaceInvitationRepo, workspaceInvitationCache, authzService, notificationService)
 	workspaceInvitationHandler := handler.NewWorkspaceInvitationHandler(workspaceInvitationService)
 
 	archiveRepo := repository.NewArchiveRepository(queries)

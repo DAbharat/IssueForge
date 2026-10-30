@@ -19,13 +19,15 @@ type ProjectMemberService struct {
 	repo                   ProjectMemberRepo
 	projectActivityService ProjectActivityRecorder
 	authz                  AuthzService
+	notifier               NotificationSender
 }
 
-func NewProjectMemberService(repo ProjectMemberRepo, projectActivityService ProjectActivityRecorder, authz AuthzService) *ProjectMemberService {
+func NewProjectMemberService(repo ProjectMemberRepo, projectActivityService ProjectActivityRecorder, authz AuthzService, notifier NotificationSender) *ProjectMemberService {
 	return &ProjectMemberService{
 		repo:                   repo,
 		projectActivityService: projectActivityService,
 		authz:                  authz,
+		notifier:               notifier,
 	}
 }
 
@@ -49,6 +51,20 @@ func (s *ProjectMemberService) AddMemberToProject(ctx context.Context, projectID
 		_, err = s.projectActivityService.CreateProjectActivity(ctx, projectID, userID, &targetUserID, "PROJECT_MEMBER_ADDED", nil, nil, nil)
 		if err != nil {
 			return dto.ProjectMemberResponse{}, fmt.Errorf("create project activity: %w", err)
+		}
+	}
+
+	if s.notifier != nil {
+		if err := s.notifier.SendNotification(
+			ctx,
+			userID,
+			nil,
+			"PROJECT_MEMBER_ADDED",
+			"Added to Project",
+			"You have been added as a project member",
+			&projectID, nil, nil,
+		); err != nil {
+			fmt.Printf("failed to send notification: %v\n", err)
 		}
 	}
 
@@ -104,6 +120,20 @@ func (s *ProjectMemberService) SafeAddMemberToProject(ctx context.Context, req d
 		_, err = s.projectActivityService.CreateProjectActivity(ctx, projectID, leadID, &targetUserID, "PROJECT_MEMBER_ADDED", nil, nil, nil)
 		if err != nil {
 			return dto.ProjectMemberResponse{}, fmt.Errorf("create project activity: %w", err)
+		}
+	}
+
+	if s.notifier != nil {
+		if err := s.notifier.SendNotification(
+			ctx,
+			req.UserID,
+			&leadID,
+			"PROJECT_MEMBER_ADDED",
+			"Added to Project",
+			"You have been added as a project member",
+			&projectID, nil, nil,
+		); err != nil {
+			fmt.Printf("failed to send notification: %v\n", err)
 		}
 	}
 

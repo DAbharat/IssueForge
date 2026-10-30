@@ -21,14 +21,16 @@ type WorkspaceMemberRepos interface {
 }
 
 type WorkspaceMemberService struct {
-	repo  WorkspaceMemberRepos
-	authz AuthzService
+	repo     WorkspaceMemberRepos
+	authz    AuthzService
+	notifier NotificationSender
 }
 
-func NewWorkspaceMemberService(repo WorkspaceMemberRepos, authz AuthzService) *WorkspaceMemberService {
+func NewWorkspaceMemberService(repo WorkspaceMemberRepos, authz AuthzService, notifier NotificationSender) *WorkspaceMemberService {
 	return &WorkspaceMemberService{
-		repo:  repo,
-		authz: authz,
+		repo:     repo,
+		authz:    authz,
+		notifier: notifier,
 	}
 }
 
@@ -51,6 +53,21 @@ func (s *WorkspaceMemberService) AddWorkspaceMember(ctx context.Context, adminID
 		return dto.WorkspaceMemberResponse{}, fmt.Errorf("add workspace member: %w", err)
 	}
 	log.Printf("add member: %v", member)
+
+	if s.notifier != nil {
+		if err := s.notifier.SendNotification(
+			ctx,
+			req.UserID,
+			&adminID,
+			"WORKSPACE_MEMBER_ADDED",
+			"Added to Workspace",
+			"You have been added to the workspace",
+			nil, nil, &workspaceID,
+		); err != nil {
+			log.Printf("failed to send notification: %v", err)
+		}
+	}
+
 	return dto.WorkspaceMemberResponse{
 		WorkspaceID: member.WorkspaceID,
 		UserID:      member.UserID,
@@ -147,6 +164,21 @@ func (s *WorkspaceMemberService) RemoveWorkspaceMember(ctx context.Context, work
 		}
 		return dto.RemoveWorkspaceMemberResponse{}, fmt.Errorf("remove workspace member: %w", err)
 	}
+
+	if s.notifier != nil {
+		if err := s.notifier.SendNotification(
+			ctx,
+			targetUserID,
+			&adminID,
+			"WORKSPACE_MEMBER_REMOVED",
+			"Removed from Workspace",
+			"You have been removed from the workspace",
+			nil, nil, &workspaceID,
+		); err != nil {
+			log.Printf("failed to send notification: %v", err)
+		}
+	}
+
 	return dto.RemoveWorkspaceMemberResponse{
 		WorkspaceID: member.WorkspaceID,
 		UserID:      member.UserID,

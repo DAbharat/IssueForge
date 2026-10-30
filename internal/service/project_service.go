@@ -30,14 +30,16 @@ type ProjectService struct {
 	projectCache           cache.ProjectCache
 	projectActivityService ProjectActivityRecorder
 	authz                  AuthzService
+	notifier               NotificationSender
 }
 
-func NewProjectService(repo ProjectRepo, projectCache cache.ProjectCache, projectActivityService ProjectActivityRecorder, authz AuthzService) *ProjectService {
+func NewProjectService(repo ProjectRepo, projectCache cache.ProjectCache, projectActivityService ProjectActivityRecorder, authz AuthzService, notifier NotificationSender) *ProjectService {
 	return &ProjectService{
 		projectRepo:            repo,
 		projectCache:           projectCache,
 		projectActivityService: projectActivityService,
 		authz:                  authz,
+		notifier:               notifier,
 	}
 }
 
@@ -203,6 +205,20 @@ func (s *ProjectService) UpdateProjectDetails(ctx context.Context, requesterID i
 
 	s.invalidateProjectCache(ctx, project.ID)
 
+	if s.notifier != nil && project.LeadID > 0 && project.LeadID != requesterID {
+		if err := s.notifier.SendNotification(
+			ctx,
+			project.LeadID,
+			&requesterID,
+			"PROJECT_DETAILS_UPDATED",
+			"Project Details Updated",
+			fmt.Sprintf("Details for project '%s' have been updated", project.Name),
+			&project.ID, nil, &project.WorkspaceID,
+		); err != nil {
+			log.Printf("failed to send notification: %v", err)
+		}
+	}
+
 	return dto.ProjectResponse{
 		ID:          project.ID,
 		WorkspaceID: project.WorkspaceID,
@@ -264,6 +280,35 @@ func (s *ProjectService) UpdateProjectLead(ctx context.Context, requesterID int6
 
 	s.invalidateProjectCache(ctx, project.ID)
 
+	if s.notifier != nil {
+		if req.LeadID != nil {
+			if err := s.notifier.SendNotification(
+				ctx,
+				*req.LeadID,
+				&requesterID,
+				"PROJECT_LEAD_CHANGED",
+				"Assigned as Project Lead",
+				fmt.Sprintf("You are now the lead of project '%s'", project.Name),
+				&project.ID, nil, &project.WorkspaceID,
+			); err != nil {
+				log.Printf("failed to send notification: %v", err)
+			}
+		}
+		if dbProject.LeadID > 0 && (req.LeadID == nil || dbProject.LeadID != *req.LeadID) && dbProject.LeadID != requesterID {
+			if err := s.notifier.SendNotification(
+				ctx,
+				dbProject.LeadID,
+				&requesterID,
+				"PROJECT_LEAD_REMOVED",
+				"Removed as Project Lead",
+				fmt.Sprintf("You are no longer the lead of project '%s'", project.Name),
+				&project.ID, nil, &project.WorkspaceID,
+			); err != nil {
+				log.Printf("failed to send notification: %v", err)
+			}
+		}
+	}
+
 	return dto.ProjectResponse{
 		ID:          project.ID,
 		WorkspaceID: project.WorkspaceID,
@@ -311,6 +356,20 @@ func (s *ProjectService) DeleteProject(ctx context.Context, requesterID, project
 	}
 
 	s.invalidateProjectCache(ctx, project.ID)
+
+	if s.notifier != nil && dbProject.LeadID > 0 && dbProject.LeadID != requesterID {
+		if err := s.notifier.SendNotification(
+			ctx,
+			dbProject.LeadID,
+			&requesterID,
+			"PROJECT_DELETED",
+			"Project Deleted",
+			fmt.Sprintf("Project '%s' was deleted", dbProject.Name),
+			&project.ID, nil, &project.WorkspaceID,
+		); err != nil {
+			log.Printf("failed to send notification: %v", err)
+		}
+	}
 
 	return dto.ProjectResponse{
 		ID:          project.ID,
@@ -392,6 +451,20 @@ func (s *ProjectService) RestoreProject(ctx context.Context, requesterID, projec
 	}
 
 	s.invalidateProjectCache(ctx, project.ID)
+
+	if s.notifier != nil && project.LeadID > 0 && project.LeadID != requesterID {
+		if err := s.notifier.SendNotification(
+			ctx,
+			project.LeadID,
+			&requesterID,
+			"PROJECT_RESTORED",
+			"Project Restored",
+			fmt.Sprintf("Project '%s' has been restored", project.Name),
+			&project.ID, nil, &project.WorkspaceID,
+		); err != nil {
+			log.Printf("failed to send notification: %v", err)
+		}
+	}
 
 	return dto.ProjectResponse{
 		ID:          project.ID,

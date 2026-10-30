@@ -24,6 +24,7 @@ type WorkspaceRepo interface {
 
 type WorkspaceMemRepo interface {
 	AddWorkspaceMember(ctx context.Context, workspaceID, userID int64, role string) (sqlc.WorkspaceMember, error)
+	ListWorkspaceMembers(ctx context.Context, workspaceID int64) ([]sqlc.ListWorkspaceMembersRow, error)
 }
 
 type WorkspaceService struct {
@@ -31,14 +32,16 @@ type WorkspaceService struct {
 	workspaceCache      cache.WorkspaceCache
 	authz               AuthzService
 	workspaceMemberRepo WorkspaceMemRepo
+	notifier            NotificationSender
 }
 
-func NewWorkspaceService(repo WorkspaceRepo, workspaceCache cache.WorkspaceCache, workspaceMemRepo WorkspaceMemRepo, authz AuthzService) *WorkspaceService {
+func NewWorkspaceService(repo WorkspaceRepo, workspaceCache cache.WorkspaceCache, workspaceMemRepo WorkspaceMemRepo, authz AuthzService, notifier NotificationSender) *WorkspaceService {
 	return &WorkspaceService{
 		repo:                repo,
 		workspaceCache:      workspaceCache,
 		workspaceMemberRepo: workspaceMemRepo,
 		authz:               authz,
+		notifier:            notifier,
 	}
 }
 
@@ -173,6 +176,27 @@ func (s *WorkspaceService) UpdateWorkspaceName(ctx context.Context, requesterID,
 
 	s.invalidateWorkspaceCache(ctx, workspace.ID)
 
+	if s.notifier != nil {
+		members, mErr := s.workspaceMemberRepo.ListWorkspaceMembers(ctx, workspace.ID)
+		if mErr == nil {
+			for _, m := range members {
+				if m.ID != requesterID {
+					if err := s.notifier.SendNotification(
+						ctx,
+						m.ID,
+						&requesterID,
+						"WORKSPACE_DETAILS_UPDATED",
+						"Workspace Updated",
+						fmt.Sprintf("Workspace name was updated to '%s'", workspace.Name),
+						nil, nil, &workspace.ID,
+					); err != nil {
+						log.Printf("failed to send notification: %v", err)
+					}
+				}
+			}
+		}
+	}
+
 	return dto.WorkspaceResponse{
 		ID:        workspace.ID,
 		Name:      workspace.Name,
@@ -200,6 +224,27 @@ func (s *WorkspaceService) DeleteWorkspace(ctx context.Context, requesterID, wor
 
 	s.invalidateWorkspaceCache(ctx, workspaceID)
 
+	if s.notifier != nil {
+		members, mErr := s.workspaceMemberRepo.ListWorkspaceMembers(ctx, workspaceID)
+		if mErr == nil {
+			for _, m := range members {
+				if m.ID != requesterID {
+					if err := s.notifier.SendNotification(
+						ctx,
+						m.ID,
+						&requesterID,
+						"WORKSPACE_DELETED",
+						"Workspace Deleted",
+						"A workspace you belong to has been deleted",
+						nil, nil, &workspaceID,
+					); err != nil {
+						log.Printf("failed to send notification: %v", err)
+					}
+				}
+			}
+		}
+	}
+
 	return id, nil
 }
 
@@ -221,6 +266,27 @@ func (s *WorkspaceService) RestoreDeletedWorkspace(ctx context.Context, requeste
 	}
 
 	s.invalidateWorkspaceCache(ctx, workspace.ID)
+
+	if s.notifier != nil {
+		members, mErr := s.workspaceMemberRepo.ListWorkspaceMembers(ctx, workspace.ID)
+		if mErr == nil {
+			for _, m := range members {
+				if m.ID != requesterID {
+					if err := s.notifier.SendNotification(
+						ctx,
+						m.ID,
+						&requesterID,
+						"WORKSPACE_RESTORED",
+						"Workspace Restored",
+						fmt.Sprintf("Workspace '%s' has been restored", workspace.Name),
+						nil, nil, &workspace.ID,
+					); err != nil {
+						log.Printf("failed to send notification: %v", err)
+					}
+				}
+			}
+		}
+	}
 
 	response := dto.WorkspaceResponse{
 		ID:        workspace.ID,

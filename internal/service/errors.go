@@ -71,4 +71,6 @@ var (
 	ErrParentProjectDeleted          = errors.New("cannot restore: parent project is archived. Please restore the project first.")
 	ErrDuplicateGoogleSub            = errors.New("this google account is already linked to another user")
 	ErrInvalidHandoffCode            = errors.New("invalid or expired handoff code")
+	ErrNotificationNotFound          = errors.New("notification not found")
+	ErrInvalidNotificationID         = errors.New("invalid notification id")
 )

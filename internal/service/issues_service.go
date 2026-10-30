@@ -40,15 +40,17 @@ type IssueService struct {
 	activityRepo           ActivityService
 	projectActivityService ProjectActivityRecorder
 	authz                  AuthzService
+	notifier               NotificationSender
 }
 
-func NewIssueService(repo IssueRepo, issueCache cache.IssueCache, activity ActivityService, projectActivity ProjectActivityRecorder, authz AuthzService) *IssueService {
+func NewIssueService(repo IssueRepo, issueCache cache.IssueCache, activity ActivityService, projectActivity ProjectActivityRecorder, authz AuthzService, notifier NotificationSender) *IssueService {
 	return &IssueService{
 		repo:                   repo,
 		issueCache:             issueCache,
 		activityRepo:           activity,
 		projectActivityService: projectActivity,
 		authz:                  authz,
+		notifier:               notifier,
 	}
 }
 
@@ -136,6 +138,20 @@ func (s *IssueService) CreateIssue(ctx context.Context, creatorID int64, req dto
 	var dueDate *time.Time
 	if issue.DueDate.Valid {
 		dueDate = &issue.DueDate.Time
+	}
+
+	if s.notifier != nil && assignedTo != nil {
+		if err := s.notifier.SendNotification(
+			ctx,
+			*assignedTo,
+			&creatorID,
+			"ISSUE_ASSIGNED_TO_YOU",
+			"Issue Assigned to You",
+			fmt.Sprintf("You have been assigned to issue '%s'", issueTitle),
+			&issue.ProjectID, &issue.ID, nil,
+		); err != nil {
+			log.Printf("failed to send notification: %v", err)
+		}
 	}
 
 	return dto.CreateIssueResponse{
@@ -385,6 +401,26 @@ func (s *IssueService) UpdateIssueDetails(ctx context.Context, requesterID, issu
 
 	s.invalidateIssueCache(ctx, issues.ID)
 
+	if s.notifier != nil && (oldTitle != newTitle || oldDesc != newDesc) {
+		targetUserID := dbIssue.CreatedBy
+		if dbIssue.AssignedTo.Valid {
+			targetUserID = dbIssue.AssignedTo.Int64
+		}
+		if targetUserID != requesterID {
+			if err := s.notifier.SendNotification(
+				ctx,
+				targetUserID,
+				&requesterID,
+				"ISSUE_DETAILS_UPDATED",
+				"Issue Details Updated",
+				fmt.Sprintf("Details of issue '%s' were updated", issues.Title),
+				&issues.ProjectID, &issues.ID, nil,
+			); err != nil {
+				log.Printf("failed to send notification: %v", err)
+			}
+		}
+	}
+
 	return dto.IssueResponse{
 		ID:           issues.ID,
 		ProjectID:    issues.ProjectID,
@@ -454,6 +490,26 @@ func (s *IssueService) UpdateIssueStatus(ctx context.Context, requesterID, issue
 	}
 
 	s.invalidateIssueCache(ctx, issue.ID)
+
+	if s.notifier != nil && oldStatus != newStatus {
+		targetUserID := dbIssue.CreatedBy
+		if dbIssue.AssignedTo.Valid {
+			targetUserID = dbIssue.AssignedTo.Int64
+		}
+		if targetUserID != requesterID {
+			if err := s.notifier.SendNotification(
+				ctx,
+				targetUserID,
+				&requesterID,
+				"ISSUE_STATUS_CHANGED",
+				"Issue Status Changed",
+				fmt.Sprintf("Status of issue '%s' changed from %s to %s", issue.Title, oldStatus, newStatus),
+				&issue.ProjectID, &issue.ID, nil,
+			); err != nil {
+				log.Printf("failed to send notification: %v", err)
+			}
+		}
+	}
 
 	return dto.IssueResponse{
 		ID:           issue.ID,
@@ -551,6 +607,34 @@ func (s *IssueService) UpdateIssueAssignee(ctx context.Context, requesterID, iss
 
 	s.invalidateIssueCache(ctx, issue.ID)
 
+	if s.notifier != nil {
+		if assignedTo != nil {
+			if err := s.notifier.SendNotification(
+				ctx,
+				*assignedTo,
+				&requesterID,
+				"ISSUE_ASSIGNED_TO_YOU",
+				"Issue Assigned to You",
+				fmt.Sprintf("You have been assigned to issue '%s'", issue.Title),
+				&issue.ProjectID, &issue.ID, nil,
+			); err != nil {
+				log.Printf("failed to send notification: %v", err)
+			}
+		} else if dbIssue.AssignedTo.Valid {
+			if err := s.notifier.SendNotification(
+				ctx,
+				dbIssue.AssignedTo.Int64,
+				&requesterID,
+				"ISSUE_ASSIGNEE_REMOVED",
+				"Unassigned from Issue",
+				fmt.Sprintf("You were unassigned from issue '%s'", issue.Title),
+				&issue.ProjectID, &issue.ID, nil,
+			); err != nil {
+				log.Printf("failed to send notification: %v", err)
+			}
+		}
+	}
+
 	return dto.IssueResponse{
 		ID:           issue.ID,
 		ProjectID:    issue.ProjectID,
@@ -623,6 +707,26 @@ func (s *IssueService) UpdateIssuePriority(ctx context.Context, requesterID, iss
 	}
 
 	s.invalidateIssueCache(ctx, issue.ID)
+
+	if s.notifier != nil && oldPriority != newPriority {
+		targetUserID := dbIssue.CreatedBy
+		if dbIssue.AssignedTo.Valid {
+			targetUserID = dbIssue.AssignedTo.Int64
+		}
+		if targetUserID != requesterID {
+			if err := s.notifier.SendNotification(
+				ctx,
+				targetUserID,
+				&requesterID,
+				"ISSUE_PRIORITY_CHANGED",
+				"Issue Priority Changed",
+				fmt.Sprintf("Priority of issue '%s' changed from %s to %s", issue.Title, oldPriority, newPriority),
+				&issue.ProjectID, &issue.ID, nil,
+			); err != nil {
+				log.Printf("failed to send notification: %v", err)
+			}
+		}
+	}
 
 	return dto.IssueResponse{
 		ID:           issue.ID,
@@ -825,6 +929,26 @@ func (s *IssueService) DeleteIssue(ctx context.Context, requesterID, issueID int
 	if err != nil {
 		return 0, fmt.Errorf("create activity: %w", err)
 	}
+
+	if s.notifier != nil {
+		targetUserID := dbIssue.CreatedBy
+		if dbIssue.AssignedTo.Valid {
+			targetUserID = dbIssue.AssignedTo.Int64
+		}
+		if targetUserID != requesterID {
+			if err := s.notifier.SendNotification(
+				ctx,
+				targetUserID,
+				&requesterID,
+				"ISSUE_DELETED",
+				"Issue Deleted",
+				fmt.Sprintf("Issue '%s' was deleted", dbIssue.Title),
+				&dbIssue.ProjectID, &dbIssue.ID, nil,
+			); err != nil {
+				log.Printf("failed to send notification: %v", err)
+			}
+		}
+	}
 	return id, nil
 }
 
@@ -877,6 +1001,26 @@ func (s *IssueService) RestoreDeletedIssue(ctx context.Context, requesterID, iss
 			return dto.IssueResponse{}, ErrIssueNotFound
 		}
 		return dto.IssueResponse{}, fmt.Errorf("get issue by id: %w", err)
+	}
+
+	if s.notifier != nil {
+		targetUserID := newIssue.CreatedBy
+		if newIssue.AssignedTo.Valid {
+			targetUserID = newIssue.AssignedTo.Int64
+		}
+		if targetUserID != requesterID {
+			if err := s.notifier.SendNotification(
+				ctx,
+				targetUserID,
+				&requesterID,
+				"ISSUE_RESTORED",
+				"Issue Restored",
+				fmt.Sprintf("Issue '%s' was restored", newIssue.Title),
+				&newIssue.ProjectID, &newIssue.ID, nil,
+			); err != nil {
+				log.Printf("failed to send notification: %v", err)
+			}
+		}
 	}
 
 	var assignee *int64

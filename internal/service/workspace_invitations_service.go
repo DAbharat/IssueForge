@@ -27,13 +27,15 @@ type WorkspaceInvitationService struct {
 	workspaceInvitationRepo  WorkspaceInvitationsRepository
 	workspaceInvitationCache cache.WorkspaceInvitationCache
 	authz                    AuthzService
+	notifier                 NotificationSender
 }
 
-func NewWorkspaceInvitationService(workspaceInvitationRepo WorkspaceInvitationsRepository, workspaceInvitationCache cache.WorkspaceInvitationCache, authz AuthzService) *WorkspaceInvitationService {
+func NewWorkspaceInvitationService(workspaceInvitationRepo WorkspaceInvitationsRepository, workspaceInvitationCache cache.WorkspaceInvitationCache, authz AuthzService, notifier NotificationSender) *WorkspaceInvitationService {
 	return &WorkspaceInvitationService{
 		workspaceInvitationRepo:  workspaceInvitationRepo,
 		workspaceInvitationCache: workspaceInvitationCache,
 		authz:                    authz,
+		notifier:                 notifier,
 	}
 }
 
@@ -80,6 +82,20 @@ func (s *WorkspaceInvitationService) CreateWorkspaceInvitation(ctx context.Conte
 
 	s.invalidateInvitationUserCache(ctx, invitation.InvitedUserID)
 	s.invalidateInvitationWorkspaceCache(ctx, invitation.WorkspaceID)
+
+	if s.notifier != nil {
+		if err := s.notifier.SendNotification(
+			ctx,
+			invitation.InvitedUserID,
+			&requesterID,
+			"WORKSPACE_INVITATION_RECEIVED",
+			"Workspace Invitation Received",
+			"You have been invited to join a workspace",
+			nil, nil, &workspaceID,
+		); err != nil {
+			log.Printf("failed to send notification: %v", err)
+		}
+	}
 
 	return response, nil
 }
@@ -233,6 +249,8 @@ func (s *WorkspaceInvitationService) AcceptInvitation(ctx context.Context, invit
 		return dto.WorkspaceInvitationResponse{}, ErrInvalidUserID
 	}
 
+	invDetails, _ := s.workspaceInvitationRepo.GetWorkspaceInvitation(ctx, invitationID)
+
 	invitation, err := s.workspaceInvitationRepo.AcceptInvitation(ctx, invitationID, requesterID)
 	if err != nil {
 		if errors.Is(err, repository.ErrInvitationNotFound) {
@@ -260,6 +278,20 @@ func (s *WorkspaceInvitationService) AcceptInvitation(ctx context.Context, invit
 	s.invalidateInvitationUserCache(ctx, invitation.InvitedUserID)
 	s.invalidateInvitationWorkspaceCache(ctx, invitation.WorkspaceID)
 
+	if s.notifier != nil && invDetails.InvitedBy > 0 {
+		if err := s.notifier.SendNotification(
+			ctx,
+			invDetails.InvitedBy,
+			&requesterID,
+			"WORKSPACE_INVITATION_ACCEPTED",
+			"Workspace Invitation Accepted",
+			"A user has accepted your workspace invitation",
+			nil, nil, &invitation.WorkspaceID,
+		); err != nil {
+			log.Printf("failed to send notification: %v", err)
+		}
+	}
+
 	return response, nil
 }
 
@@ -270,6 +302,8 @@ func (s *WorkspaceInvitationService) DeclineInvitation(ctx context.Context, invi
 	if requesterID <= 0 {
 		return dto.WorkspaceInvitationResponse{}, ErrInvalidUserID
 	}
+
+	invDetails, _ := s.workspaceInvitationRepo.GetWorkspaceInvitation(ctx, invitationID)
 
 	invitation, err := s.workspaceInvitationRepo.DeclineInvitation(ctx, invitationID, requesterID)
 	if err != nil {
@@ -294,6 +328,20 @@ func (s *WorkspaceInvitationService) DeclineInvitation(ctx context.Context, invi
 
 	s.invalidateInvitationUserCache(ctx, invitation.InvitedUserID)
 	s.invalidateInvitationWorkspaceCache(ctx, invitation.WorkspaceID)
+
+	if s.notifier != nil && invDetails.InvitedBy > 0 {
+		if err := s.notifier.SendNotification(
+			ctx,
+			invDetails.InvitedBy,
+			&requesterID,
+			"WORKSPACE_INVITATION_DECLINED",
+			"Workspace Invitation Declined",
+			"A user has declined your workspace invitation",
+			nil, nil, &invitation.WorkspaceID,
+		); err != nil {
+			log.Printf("failed to send notification: %v", err)
+		}
+	}
 
 	return response, nil
 }
