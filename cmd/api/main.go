@@ -225,6 +225,8 @@ func main() {
 	analyticsService := service.NewAnalyticsService(analyticsRepo, authzService)
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
 
+	notificationHandler := handler.NewNotificationHandler(notificationService)
+
 	r := router.New(userHandler,
 		projectHandler,
 		projectMemberHandler,
@@ -239,6 +241,7 @@ func main() {
 		workspaceInvitationHandler,
 		archiveHandler,
 		analyticsHandler,
+		notificationHandler,
 		authMiddleware,
 		reg,
 		strictRateLimit,
