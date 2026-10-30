@@ -27,12 +27,17 @@ The backend leverages a clean layered architecture, combining PostgreSQL with **
   - [Issues](#7-issues)
   - [Comments](#8-comments)
   - [Issue Activity & Audit Trail](#9-issue-activity--audit-trail)
-  - [Issue & Comment Attachments](#10-issue--comment-attachments)
-  - [Labels](#11-labels)
-  - [Archive & Soft-Delete Recovery](#12-archive--soft-delete-recovery)
-  - [Health & Metrics](#13-health--metrics)
+  - [Project Activity & Audit Trail](#10-project-activity--audit-trail)
+  - [Issue & Comment Attachments](#11-issue--comment-attachments)
+  - [Labels](#12-labels)
+  - [Archive & Soft-Delete Recovery](#13-archive--soft-delete-recovery)
+  - [Notifications](#14-notifications)
+  - [Analytics](#15-analytics)
+  - [Health & Metrics](#16-health--metrics)
 - [Database & Migrations](#database--migrations)
 - [Caching & Asynchronous Queues](#caching--asynchronous-queues)
+  - [Multi-Level Redis Cache](#multi-level-redis-cache)
+  - [Asynchronous BullMQ Queues & Workers](#asynchronous-bullmq-queues--workers)
 - [Authentication & Security](#authentication--security)
   - [Google OIDC & Redis Handoff Exchange](#google-oidc--redis-handoff-exchange)
   - [Role-Based Access Control (RBAC)](#role-based-access-control-rbac)
@@ -58,7 +63,9 @@ The backend leverages a clean layered architecture, combining PostgreSQL with **
 - **Workspace Invitations**: Asynchronous email/username invitation workflow with invitation tokens, lifecycle transitions (`pending`, `accepted`, `declined`, `canceled`), and Redis caching.
 - **Project Organization**: Organize projects within workspaces, assign project leads, manage project-specific members, and soft-delete/restore projects.
 - **Issue Lifecycle Tracking**: Manage issues with priority levels (`low`, `medium`, `high`, `urgent`), statuses (`backlog`, `todo`, `in_progress`, `done`, `canceled`), assignees, due dates, and soft-delete recovery.
-- **Activity History & Audit Trail**: Automated audit logging capturing every attribute transition (title, status, priority, assignee, due date changes).
+- **In-App Notifications**: Event-driven notification system featuring 30 distinct lifecycle event triggers (workspace invitations & members, project assignments & transitions, issue updates, and threaded comment replies), read status tracking, unread count badge endpoints, and bulk cleanup.
+- **Workspace & Project Analytics**: Rich aggregated analytics dashboards detailing velocity, issue distribution by status and priority, activity breakdowns, and member leaderboards.
+- **Activity History & Audit Trail**: Automated audit logging capturing every attribute transition (title, status, priority, assignee, due date changes) for both issues and projects.
 - **Nested Comments**: Add, update, and delete issue comments with author tracking and attachment links.
 - **Custom Labels**: Project-scoped labels with hex color codes, and batch label attachment/detachment on issues.
 - **File & Image Attachments**: Secure multi-file uploads via Cloudinary integration with background cleanup workers.
@@ -71,8 +78,9 @@ The backend leverages a clean layered architecture, combining PostgreSQL with **
 - **Automated Account Linking**: Seamlessly binds Google OIDC identities to existing accounts with matching verified emails or auto-provisions new users with sanitized handles.
 - **Type-Safe Persistence with sqlc**: Zero-reflection, high-speed PostgreSQL query layer generated with `sqlc` on `pgx/v5` connection pools.
 - **Multi-Level Redis Caching**: Read-through and invalidation caching for projects, workspaces, issues, and pending invitations.
-- **Asynchronous Task Queues**: GoBullMQ background worker for out-of-band Cloudinary media deletion with graceful context cancellation.
+- **Decoupled Asynchronous Task Queues**: Multiple GoBullMQ background queues for out-of-band Cloudinary media deletion, asynchronous notification creation, and two-phase bulk notification cleanup with graceful shutdown.
 - **Distributed Rate Limiting**: Multi-tier Redis token-bucket rate limiters applied at router boundaries (Strict, Auth, Read, Write, Issues, Delete, Create, Patch, Attachments).
+- **Self-Notification Suppression & Foreign Key Safety**: Event triggers automatically suppress notifications for the triggering user and properly handle nullable relational keys without transaction failure.
 - **RED Principle Observability**: Full Prometheus integration (`/api/metrics`) measuring Rate, Errors, and Duration, combined with Go runtime and process collectors.
 - **Graceful Shutdown**: Intercepts `SIGINT`/`SIGTERM` to safely drain background queue workers, close PostgreSQL pools, and shut down HTTP servers with timeouts.
 
@@ -88,7 +96,7 @@ The backend leverages a clean layered architecture, combining PostgreSQL with **
 | **Database** | PostgreSQL 17 + `pgx/v5` (v5.10.0) | Relational database & high-performance connection pool |
 | **SQL Code Generation** | `sqlc` | Type-safe Go models and database access from raw SQL |
 | **Caching & KV Store** | Redis 7 + `go-redis/v9` (v9.21.0) | Multi-level cache, session store, rate limits & OIDC handoff |
-| **Background Queues** | GoBullMQ (`github.com/DAbharat/gobullmq`) | Redis-backed distributed queue for asynchronous asset cleanup |
+| **Background Queues** | GoBullMQ (`github.com/DAbharat/gobullmq`) | Redis-backed distributed queues for media purge and notification processing |
 | **Authentication** | JWT (`golang-jwt/jwt/v5`), bcrypt (`x/crypto`) | Stateless access tokens (15m) & Redis refresh tokens (7d) |
 | **Federated Identity** | `coreos/go-oidc/v3`, `golang.org/x/oauth2` | Google OpenID Connect ID token verification |
 | **Media Storage** | Cloudinary Go SDK (`cloudinary-go/v2`) | Cloud asset storage for images and attachments |
@@ -113,17 +121,19 @@ IssueForge/
 │   ├── db/                                 # Database connectivity & persistence
 │   │   ├── config/                         # Environment configuration parser & validator
 │   │   │   └── config.go                   # Config struct and missing env checks
-│   │   ├── migrations/                     # 21 versioned SQL schema migrations
+│   │   ├── migrations/                     # 24 versioned SQL schema migrations
 │   │   ├── postgres.go                     # pgxpool connection initialization
 │   │   ├── queries/                        # SQL source queries consumed by sqlc
 │   │   └── sqlc/                           # Auto-generated type-safe PostgreSQL database client
 │   ├── dto/                                # Request & response Data Transfer Objects
+│   │   ├── analytics.go                    # Analytics aggregate metrics DTOs
 │   │   ├── archive_dto.go                  # Archive count & restoration DTOs
 │   │   ├── comment.go                      # Comment payload DTOs
 │   │   ├── issue.go                        # Issue CRUD & filter DTOs
 │   │   ├── issue_activity.go               # Activity trail DTOs
 │   │   ├── issue_attachments.go            # Attachment upload DTOs
 │   │   ├── labels.go                       # Label definition & attachment DTOs
+│   │   ├── notification.go                 # Notification payload & count DTOs
 │   │   ├── project.go                      # Project management DTOs
 │   │   ├── project_members.go              # Project membership DTOs
 │   │   ├── user.go                         # Auth, user profile, & OIDC handoff DTOs
@@ -131,13 +141,16 @@ IssueForge/
 │   │   ├── workspace_invitations.go        # Workspace invitation DTOs
 │   │   └── workspace_members.go            # Workspace member DTOs
 │   ├── handler/                            # HTTP controllers / request handlers
+│   │   ├── analytics_handler.go            # Workspace & project analytics endpoints
 │   │   ├── archive_handler.go              # Archive listing & stats endpoints
 │   │   ├── comment_handler.go              # Comment endpoints
 │   │   ├── health_handler.go               # System health & status checks
-│   │   ├── issue_activity_handler.go       # Audit trail query endpoints
+│   │   ├── issue_activity_handler.go       # Issue audit trail query endpoints
 │   │   ├── issue_attachments_handler.go    # Media upload & soft-delete endpoints
 │   │   ├── issues_handler.go               # Issue management endpoints
 │   │   ├── labels_handler.go               # Label definition & assignment endpoints
+│   │   ├── notification_handler.go         # In-app notifications & read-status endpoints
+│   │   ├── project_activity_handler.go     # Project audit trail query endpoints
 │   │   ├── project_handler.go              # Project lifecycle endpoints
 │   │   ├── project_members_handler.go      # Project membership endpoints
 │   │   ├── user_handler.go                 # Auth, OIDC, handoff exchange, & user endpoints
@@ -161,43 +174,69 @@ IssueForge/
 │   │   ├── queue/                          # Asynchronous task queues
 │   │   │   ├── delete_queue.go             # BullMQ attachment deletion producer
 │   │   │   ├── delete_worker.go            # BullMQ background worker for Cloudinary asset deletion
-│   │   │   └── jobs.go                     # Queue job payloads
+│   │   │   ├── jobs.go                     # Queue job payloads (media purge, notification create/delete)
+│   │   │   ├── notification_queue.go       # BullMQ notification create & delete producers
+│   │   │   └── notification_worker.go      # BullMQ workers for async notification DB writes & purge
 │   │   ├── ratelimit/                      # Redis rate limit scripts
 │   │   │   └── ratelimit.go                # Token-bucket / sliding-window Redis storage
 │   │   ├── refreshtoken/                   # Refresh token session storage
 │   │   │   └── refresh_token.go            # Refresh token persistence and revocation
 │   │   └── redis.go                        # Redis client factory
 │   ├── repository/                         # Database repository layer
+│   │   ├── analytics_repository.go         # Metrics & velocity aggregations
 │   │   ├── archive_repository.go           # Soft-deleted records retrieval
 │   │   ├── authorization_repository.go     # RBAC permission queries
 │   │   ├── comment_repository.go           # Comment queries
 │   │   ├── errors.go                       # Repository-level error sentinels
-│   │   ├── issue_activity_repository.go    # Audit log recording & retrieval
+│   │   ├── issue_activity_repository.go    # Issue audit log recording & retrieval
 │   │   ├── issue_attachments_repository.go # Attachment metadata storage
 │   │   ├── issue_repository.go             # Issue queries & filters
 │   │   ├── labels_repository.go            # Label queries
+│   │   ├── notification_repository.go      # In-app notifications CRUD & unread count queries
+│   │   ├── project_activity_repository.go  # Project audit log recording & retrieval
 │   │   ├── project_members_repository.go   # Project member queries
 │   │   ├── project_repository.go           # Project queries
 │   │   ├── user_repository.go              # User & OIDC identity queries
 │   │   ├── workspace_invitations_repository.go # Invitation queries
 │   │   ├── workspace_members_repository.go # Workspace member queries
 │   │   └── workspace_repository.go         # Workspace queries
+│   ├── router/                             # Route definitions & rate-limit attachments
+│   │   ├── analytics_router.go             # Analytics routing
+│   │   ├── archive_router.go               # Archive routing
+│   │   ├── comment_router.go               # Comment routing
+│   │   ├── health_router.go               # Health & readiness routing
+│   │   ├── issue_activity.router.go        # Issue audit trail routing
+│   │   ├── issue_attachments_router.go     # Attachment routing
+│   │   ├── issue_router.go                 # Issue routing
+│   │   ├── labels_router.go                # Label routing
+│   │   ├── notification_router.go          # Notification routing
+│   │   ├── project_activity_router.go      # Project audit trail routing
+│   │   ├── project_members_router.go       # Project membership routing
+│   │   ├── project_router.go               # Project routing
+│   │   ├── router.go                       # Master router composition
+│   │   ├── user_router.go                  # User & auth routing
+│   │   ├── workspace_invitations_router.go # Invitation routing
+│   │   ├── workspace_members_router.go     # Workspace membership routing
+│   │   └── workspace_router.go             # Workspace routing
 │   ├── service/                            # Core business logic layer
+│   │   ├── analytics_service.go            # Analytics calculation & metric collation
 │   │   ├── archive_service.go              # Archive statistics & restoration logic
 │   │   ├── authorization.go                # Workspace & project permission enforcement
 │   │   ├── authz.go                        # Authorization contracts
-│   │   ├── comment_service.go              # Comment operations
+│   │   ├── comment_service.go              # Comment operations & notification dispatch
 │   │   ├── errors.go                       # Business domain error sentinels
-│   │   ├── issue_activity_service.go       # Audit trail generation
+│   │   ├── issue_activity_service.go       # Issue audit trail generation
 │   │   ├── issue_attachments_service.go    # Cloudinary upload & queue orchestration
-│   │   ├── issues_service.go               # Issue domain operations
+│   │   ├── issues_service.go               # Issue domain operations & notification dispatch
 │   │   ├── labels_service.go               # Label operations
-│   │   ├── project_members_service.go      # Project member operations
-│   │   ├── project_service.go              # Project domain operations
+│   │   ├── notification_service.go         # In-app notification coordination & queue routing
+│   │   ├── project_activity_service.go     # Project audit trail generation
+│   │   ├── project_members_service.go      # Project member operations & notification dispatch
+│   │   ├── project_service.go              # Project domain operations & notification dispatch
 │   │   ├── user_service.go                 # User auth, Google OIDC, & handoff logic
-│   │   ├── workspace_invitations_service.go# Invitation lifecycle management
-│   │   ├── workspace_members_service.go    # Workspace member operations
-│   │   └── workspace_service.go            # Workspace domain operations
+│   │   ├── workspace_invitations_service.go# Invitation lifecycle & notification dispatch
+│   │   ├── workspace_members_service.go    # Workspace member operations & notification dispatch
+│   │   └── workspace_service.go            # Workspace domain operations & notification dispatch
 │   └── storage/                            # Media storage interfaces
 │       ├── cloudinary.go                   # Cloudinary SDK client implementation
 │       └── storage.go                      # Cloud storage abstraction interface
@@ -250,14 +289,14 @@ IssueForge strictly enforces a unidirectional, decoupled layered architecture:
 │  (sqlc type-safe queries) │  │  (Multi-level TTL cache,│
 └─────────────┬─────────────┘  │   token handoff store)  │
               │                └─────────────────────────┘
-┌─────────────▼─────────────┐  ┌─────────────────────────┐
-│       PostgreSQL 17       │  │    GoBullMQ Worker      │
-│     (pgx connection pool) │  │  (Async asset deletion) │
-└───────────────────────────┘  └─────────────┬───────────┘
-                                             │
-                               ┌─────────────▼───────────┐
-                               │     Cloudinary API      │
-                               └─────────────────────────┘
+┌─────────────▼─────────────┐  ┌─────────────────────────────────────────────────────────┐
+│       PostgreSQL 17       │  │                     GoBullMQ Workers                    │
+│     (pgx connection pool) │  │  (Async asset deletion, notification ingestion & purge) │
+└───────────────────────────┘  └─────────────┬─────────────────────────────┬─────────────┘
+                                             │                             │
+                               ┌─────────────▼───────────┐   ┌─────────────▼─────────────┐
+                               │     Cloudinary API      │   │   PostgreSQL Ingestion    │
+                               └─────────────────────────┘   └───────────────────────────┘
 ```
 
 ---
@@ -479,7 +518,13 @@ All API routes are grouped under the `/api/` prefix. Protected routes require `A
 |---|---|---|---|---|
 | `GET` | `/api/issues/{issueID}/activities` | **Yes** | None | Retrieve chronological changelog of all issue modifications |
 
-### 10. Issue & Comment Attachments
+### 10. Project Activity & Audit Trail
+
+| Method | Endpoint | Auth | Rate Limit | Description |
+|---|---|---|---|---|
+| `GET` | `/api/projects/{projectID}/activities` | **Yes** | None | Retrieve chronological changelog of all project modifications |
+
+### 11. Issue & Comment Attachments
 
 | Method | Endpoint | Auth | Rate Limit | Description |
 |---|---|---|---|---|
@@ -489,7 +534,7 @@ All API routes are grouped under the `/api/` prefix. Protected routes require `A
 | `GET` | `/api/attachments/{attachmentID}` | **Yes** | Read (200/m) | Get attachment metadata and public download URL |
 | `DELETE`| `/api/attachments/{attachmentID}` | **Yes** | None | Soft-delete attachment metadata and enqueue async Cloudinary purge |
 
-### 11. Labels
+### 12. Labels
 
 | Method | Endpoint | Auth | Rate Limit | Description |
 |---|---|---|---|---|
@@ -502,7 +547,7 @@ All API routes are grouped under the `/api/` prefix. Protected routes require `A
 | `DELETE`| `/api/issues/{issueID}/labels/{labelID}` | **Yes** | None | Detach a label from an issue |
 | `GET` | `/api/issues/{issueID}/labels` | **Yes** | None | List all labels attached to an issue |
 
-### 12. Archive & Soft-Delete Recovery
+### 13. Archive & Soft-Delete Recovery
 
 | Method | Endpoint | Auth | Rate Limit | Description |
 |---|---|---|---|---|
@@ -512,7 +557,27 @@ All API routes are grouped under the `/api/` prefix. Protected routes require `A
 | `GET` | `/api/archive/issues` | **Yes** | Read (200/m) | List all soft-deleted issues accessible to the user |
 | `GET` | `/api/archive/attachments` | **Yes** | Read (200/m) | List all soft-deleted file attachments accessible to the user |
 
-### 13. Health & Metrics
+### 14. Notifications
+
+| Method | Endpoint | Auth | Rate Limit | Description |
+|---|---|---|---|---|
+| `GET` | `/api/notifications` | **Yes** | Read (200/m) | List notifications with optional `limit`, `offset`, and `filter=unread` |
+| `GET` | `/api/notifications/unread` | **Yes** | Read (200/m) | List only unread notifications for the caller |
+| `GET` | `/api/notifications/unread/count` | **Yes** | Read (200/m) | Fetch unread notifications count for badge indicators |
+| `GET` | `/api/notifications/{id}` | **Yes** | Read (200/m) | Get single notification by ID (scoped to recipient) |
+| `PATCH` | `/api/notifications/{id}/read` | **Yes** | None | Mark a notification as read and set `read_at = NOW()` |
+| `POST` | `/api/notifications/read-all` | **Yes** | None | Mark all caller notifications as read |
+| `DELETE`| `/api/notifications/{id}` | **Yes** | None | Delete a notification by ID |
+| `DELETE`| `/api/notifications` | **Yes** | None | Mark all notifications read and enqueue async purge job |
+
+### 15. Analytics
+
+| Method | Endpoint | Auth | Rate Limit | Description |
+|---|---|---|---|---|
+| `GET` | `/api/workspaces/{workspaceID}/analytics` | **Yes** | Read (200/m) | Get workspace analytics (issue counts by status/priority, activity trends, leaderboard) |
+| `GET` | `/api/projects/{projectID}/analytics` | **Yes** | Read (200/m) | Get project analytics (velocity, issue distributions, action breakdown) |
+
+### 16. Health & Metrics
 
 | Method | Endpoint | Auth | Rate Limit | Description |
 |---|---|---|---|---|
@@ -523,7 +588,7 @@ All API routes are grouped under the `/api/` prefix. Protected routes require `A
 
 ## Database & Migrations
 
-IssueForge utilizes PostgreSQL 17 with 21 versioned migrations in `internal/db/migrations/`:
+IssueForge utilizes PostgreSQL 17 with 24 versioned migrations in `internal/db/migrations/`:
 
 | Version | Migration Name | Key Schema Additions |
 |---|---|---|
@@ -548,6 +613,9 @@ IssueForge utilizes PostgreSQL 17 with 21 versioned migrations in `internal/db/m
 | `000019` | `create_workspace_invitations` | `workspace_invitations` table with status enum |
 | `000020` | `add_public_url_to_attachments` | Direct `public_url` storage for Cloudinary media |
 | `000021` | `add_google_sub_to_users` | `google_sub` column with unique partial index |
+| `000022` | `create_project_activities_table` | `project_activities` table with action enum & diff columns |
+| `000023` | `add_index_on_issues_and_project_activities` | Composite indexes for issue and project activity queries |
+| `000024` | `create_notifications_table` | `notifications` table with 30-type enum & recipient indexes |
 
 ---
 
@@ -561,13 +629,22 @@ Read-through caches intercept repetitive lookups with configurable TTL (`REDIS_T
 - **Issue Cache** (`cache:issue:{id}`): Invalidated on any issue field update or deletion.
 - **Invitation Cache** (`cache:invitation:{id}`): Caches pending invitations with automatic invalidation on acceptance, rejection, or cancellation.
 
-### Asynchronous BullMQ Queue
+### Asynchronous BullMQ Queues & Workers
 
-Media cleanup is completely decoupled from HTTP request latency:
-1. User deletes an attachment via `DELETE /api/attachments/{id}`.
-2. The attachment record is soft-deleted in PostgreSQL (`deleted_at = NOW()`).
-3. An asynchronous job is dispatched to GoBullMQ queue `attachment_delete_queue`.
-4. The background `AttachmentDeleteWorker` consumes the job, calls Cloudinary Destroy API, and handles retries without blocking the user.
+IssueForge decouples high-latency I/O and out-of-band writes from the primary HTTP transaction path using **GoBullMQ**:
+
+1. **Attachment Media Cleanup** (`attachment_delete_queue`):
+   - When an attachment is deleted via `DELETE /api/attachments/{id}`, the DB row is soft-deleted and an async job is enqueued.
+   - The background `AttachmentDeleteWorker` consumes the job, calls the Cloudinary Destroy API, and handles retries without blocking the user.
+
+2. **Asynchronous Notification Ingestion** (`create_notification_queue`):
+   - When business events occur (issue assigned, status/priority changed, invitation received/accepted, lead updated, comment reply), the domain service publishes a job to `create_notification_queue`.
+   - The background `NotificationCreateWorker` consumes the payload, resolves nullable relation keys safely, and persists the record to PostgreSQL.
+   - Failures or Redis latency do not block or roll back the primary database transaction.
+
+3. **Two-Phase Bulk Notification Cleanup** (`delete_all_notification_queue`):
+   - When a user triggers `DELETE /api/notifications`, the API immediately marks unread notifications as read in PostgreSQL (`is_read = TRUE, read_at = NOW()`) for instant UI feedback and enqueues a bulk delete job.
+   - The background `NotificationDeleteWorker` consumes the job and purges read notification records out-of-band.
 
 ---
 
