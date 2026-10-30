@@ -148,6 +148,76 @@ func (ns NullIssueStatus) Value() (driver.Value, error) {
 	return string(ns.IssueStatus), nil
 }
 
+type NotificationType string
+
+const (
+	NotificationTypeWORKSPACEINVITATIONRECEIVED NotificationType = "WORKSPACE_INVITATION_RECEIVED"
+	NotificationTypeWORKSPACEINVITATIONDECLINED NotificationType = "WORKSPACE_INVITATION_DECLINED"
+	NotificationTypeWORKSPACEINVITATIONACCEPTED NotificationType = "WORKSPACE_INVITATION_ACCEPTED"
+	NotificationTypeWORKSPACEMEMBERREMOVED      NotificationType = "WORKSPACE_MEMBER_REMOVED"
+	NotificationTypeWORKSPACEARCHIVED           NotificationType = "WORKSPACE_ARCHIVED"
+	NotificationTypeWORKSPACERESTORED           NotificationType = "WORKSPACE_RESTORED"
+	NotificationTypeWORKSPACEDELETED            NotificationType = "WORKSPACE_DELETED"
+	NotificationTypeWORKSPACEMEMBERADDED        NotificationType = "WORKSPACE_MEMBER_ADDED"
+	NotificationTypeWORKSPACEDETAILSUPDATED     NotificationType = "WORKSPACE_DETAILS_UPDATED"
+	NotificationTypeNEWPROJECTCREATED           NotificationType = "NEW_PROJECT_CREATED"
+	NotificationTypePROJECTMEMBERADDED          NotificationType = "PROJECT_MEMBER_ADDED"
+	NotificationTypePROJECTLEADADDED            NotificationType = "PROJECT_LEAD_ADDED"
+	NotificationTypePROJECTMEMBERREMOVED        NotificationType = "PROJECT_MEMBER_REMOVED"
+	NotificationTypePROJECTARCHIVED             NotificationType = "PROJECT_ARCHIVED"
+	NotificationTypePROJECTRESTORED             NotificationType = "PROJECT_RESTORED"
+	NotificationTypePROJECTDELETED              NotificationType = "PROJECT_DELETED"
+	NotificationTypePROJECTLEADREMOVED          NotificationType = "PROJECT_LEAD_REMOVED"
+	NotificationTypePROJECTLEADCHANGED          NotificationType = "PROJECT_LEAD_CHANGED"
+	NotificationTypePROJECTDETAILSUPDATED       NotificationType = "PROJECT_DETAILS_UPDATED"
+	NotificationTypeNEWISSUECREATED             NotificationType = "NEW_ISSUE_CREATED"
+	NotificationTypeISSUEASSIGNEDTOYOU          NotificationType = "ISSUE_ASSIGNED_TO_YOU"
+	NotificationTypeISSUEASSIGNEEREMOVED        NotificationType = "ISSUE_ASSIGNEE_REMOVED"
+	NotificationTypeISSUESTATUSCHANGED          NotificationType = "ISSUE_STATUS_CHANGED"
+	NotificationTypeISSUEPRIORITYCHANGED        NotificationType = "ISSUE_PRIORITY_CHANGED"
+	NotificationTypeISSUEDETAILSUPDATED         NotificationType = "ISSUE_DETAILS_UPDATED"
+	NotificationTypeISSUEARCHIVED               NotificationType = "ISSUE_ARCHIVED"
+	NotificationTypeISSUERESTORED               NotificationType = "ISSUE_RESTORED"
+	NotificationTypeISSUEDELETED                NotificationType = "ISSUE_DELETED"
+	NotificationTypeISSUECOMMENTADDED           NotificationType = "ISSUE_COMMENT_ADDED"
+	NotificationTypeCOMMENTREPLY                NotificationType = "COMMENT_REPLY"
+)
+
+func (e *NotificationType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = NotificationType(s)
+	case string:
+		*e = NotificationType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for NotificationType: %T", src)
+	}
+	return nil
+}
+
+type NullNotificationType struct {
+	NotificationType NotificationType `json:"notification_type"`
+	Valid            bool             `json:"valid"` // Valid is true if NotificationType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullNotificationType) Scan(value interface{}) error {
+	if value == nil {
+		ns.NotificationType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.NotificationType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullNotificationType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.NotificationType), nil
+}
+
 type ProjectActivityType string
 
 const (
@@ -306,6 +376,22 @@ type Label struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type Notification struct {
+	ID               int64              `json:"id"`
+	RecepientID      pgtype.Int8        `json:"recepient_id"`
+	SenderID         pgtype.Int8        `json:"sender_id"`
+	NotificationType NotificationType   `json:"notification_type"`
+	Title            string             `json:"title"`
+	Message          string             `json:"message"`
+	ProjectID        pgtype.Int8        `json:"project_id"`
+	IssueID          pgtype.Int8        `json:"issue_id"`
+	WorkspaceID      pgtype.Int8        `json:"workspace_id"`
+	IsRead           bool               `json:"is_read"`
+	ReadAt           pgtype.Timestamptz `json:"read_at"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Project struct {

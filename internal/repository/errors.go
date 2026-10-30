@@ -30,4 +30,5 @@ var (
 	ErrPendingInvitationExists       = errors.New("pending workspace invitation already exists")
 	ErrInvitationNotPending          = errors.New("invitation is still pending")
 	ErrDuplicateGoogleSub            = errors.New("google account already linked")
+	ErrNotificationNotFound          = errors.New("notification not found")
 )
